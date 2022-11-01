@@ -14,7 +14,6 @@ void Graph::loadGraphFromSnapFile(string filename) {
     fin.open(filename);
     fin >> nodeNum >> edgeNum;
     nodeDegreeList = new int[nodeNum];
-    memset(nodeDegreeList, 0, nodeNum * sizeof(int));
     neighborList = new nodeNeighbor[nodeNum];
     maxDeg = 0;
     for (int j = 0; j < edgeNum; j++) {
@@ -32,7 +31,6 @@ void Graph::loadGraphFromSnapFile(string filename) {
 void Graph::setNode(int _nodeNum) {
     nodeNum = _nodeNum;
     nodeDegreeList = new int[nodeNum];
-    memset(nodeDegreeList, 0, nodeNum * sizeof(int));
     neighborList = new nodeNeighbor[nodeNum + 1];
 }
 

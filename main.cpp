@@ -2,6 +2,7 @@
 #include "DataStructure/MultiLayerGraph.h"
 #include "Utils/Timer.h"
 #include "CoreDecomposition.h"
+#include <cstring>
 
 int main(int argc, char *argv[]) {
     if (argc <= 0) {
@@ -15,7 +16,7 @@ int main(int argc, char *argv[]) {
         // Load GraphCore
         loadTimer.startTimer();
         MultiLayerGraph g{};
-        g.loadGraphFromFile("/Users/ryan/Desktop/workspace/GraphCore/dataset/sample.txt");
+        g.loadGraphFromFile("../dataset/sample.txt");
         loadTimer.endTimer();
         std::cout << "Load Time: " << loadTimer.getTimerSecond() << "s." << std::endl;
         g.showGraphProperties();
