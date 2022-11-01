@@ -22,6 +22,8 @@ public:
 
     int getSize();
 
+    set<int> getCore(CoreVector cv);
+
 private:
     int layerNum;
     map<CoreVector, set<int>, CVCompartor> kCoreMap;

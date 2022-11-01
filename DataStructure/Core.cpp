@@ -13,8 +13,13 @@ void Core::addCore(CoreVector coreVector, const set<int> &nodesInCore) {
     kCoreMap.insert(pair<CoreVector, set<int>>(coreVector, nodesInCore));
 }
 
-int Core::getSize(){
+
+int Core::getSize() {
     return kCoreMap.size();
+}
+
+set<int> Core::getCore(CoreVector cv) {
+    return kCoreMap.find(cv)->second;
 }
 
 void Core::printCore() {
@@ -30,7 +35,7 @@ void Core::printCore() {
         for (int j = 0; j < layerNum; j++) {
             if (j != layerNum - 1) {
                 cout << to_string(kCoreVector.vec[j]) << ", ";
-            }else{
+            } else {
                 cout << to_string(kCoreVector.vec[j]);
             }
         }
@@ -44,5 +49,7 @@ void Core::printCore() {
     }
     cout << "===Core end===" << endl;
 }
+
+
 
 

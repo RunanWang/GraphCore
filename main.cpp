@@ -23,7 +23,7 @@ int main(int argc, char *argv[]) {
 
         // Calculate Core on MLG
         calTimer.startTimer();
-        naiveMLGCoreDecomposition(g);
+        bfsMLGCoreDecomposition(g);
         calTimer.endTimer();
         std::cout << "Total Cal Time: " << calTimer.getTimerSecond() << "s." << std::endl;
     } else if (strncmp("sg", graphType, 2) != 0) {

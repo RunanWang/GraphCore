@@ -27,28 +27,14 @@ CoreVector CoreVector::build_descendant_vector(int index) const {
     return descendant;
 }
 
-bool CoreVector::operator==(const CoreVector &rhs) const {
-    if (length != rhs.length) {
-        return false;
-    }
+int CoreVector::get_non_zero_index() const {
+    int count = 0;
     for (int j = 0; j < length; j++) {
-        if (vec[j] != rhs.vec[j]) {
-            return false;
+        if (vec[j] > 0) {
+            count += 1;
         }
     }
-    return true;
-}
-
-bool CoreVector::operator<(const CoreVector &rhs) const {
-    if (length < rhs.length) {
-        return true;
-    }
-    for (int j = 0; j < length; j++) {
-        if (vec[j] < rhs.vec[j]) {
-            return true;
-        }
-    }
-    return false;
+    return count;
 }
 
 

@@ -13,13 +13,11 @@ public:
 
     CoreVector(const int *vec, int length);
 
-    bool operator==(const CoreVector &rhs) const;
-
-    bool operator<(const CoreVector &rhs) const;
-
     CoreVector(int length);
 
     CoreVector build_descendant_vector(int index) const;
+
+    int get_non_zero_index() const;
 };
 
 struct CVCompartor {

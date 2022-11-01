@@ -11,6 +11,67 @@
 
 using namespace std;
 
+set<int> *kCore(MultiLayerGraph mlg, const set<int> &intersect, int layerNum, int NodeNum, CoreVector outQueueVector) {
+    int **nodeToLayerDegree;
+    auto inactiveNodes = queue<int>{};
+    nodeToLayerDegree = new int *[NodeNum];
+    for (int tempNode: intersect) {
+        nodeToLayerDegree[tempNode] = new int[layerNum];
+        for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+            int tempDegree = 0;
+            auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(tempNode);
+            for (auto neighborVertex: neighborVector) {
+                if (intersect.count(neighborVertex) > 0) {
+                    tempDegree += 1;
+                }
+            }
+            nodeToLayerDegree[tempNode][tempLayer] = tempDegree;
+        }
+    }
+    auto nodeSet = new set<int>{};
+    for (int tempNode: intersect) {
+        bool inCore = true;
+        for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+            if (nodeToLayerDegree[tempNode][tempLayer] < outQueueVector.vec[tempLayer]) {
+                inCore = false;
+            }
+        }
+        if (inCore) {
+            nodeSet->insert(tempNode);
+        } else {
+            inactiveNodes.push(tempNode);
+            while (!inactiveNodes.empty()) {
+                auto toPeelVertex = inactiveNodes.front();
+                inactiveNodes.pop();
+                for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+                    auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(toPeelVertex);
+                    for (auto neighborVertex: neighborVector) {
+                        if (intersect.count(neighborVertex) == 0) continue;
+                        nodeToLayerDegree[neighborVertex][tempLayer] -= 1;
+                        if (nodeToLayerDegree[neighborVertex][tempLayer] < outQueueVector.vec[tempLayer] and
+                            nodeSet->count(neighborVertex)) {
+                            nodeSet->erase(neighborVertex);
+                            inactiveNodes.push(neighborVertex);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (int tempNode: intersect) {
+        delete nodeToLayerDegree[tempNode];
+    }
+    delete nodeToLayerDegree;
+    return nodeSet;
+}
+
+void decrementDescendantCount(CoreVector cv, map<CoreVector, int, CVCompartor> *descendant_count) {
+    int count = descendant_count->find(cv)->second;
+    descendant_count->erase(cv);
+    if (count - 1 != 0) {
+        descendant_count->insert(pair<CoreVector, int>(cv, count - 1));
+    }
+}
 
 void naiveMLGCoreDecomposition(MultiLayerGraph mlg) {
     Timer AlgoTimer{};
@@ -34,7 +95,7 @@ void naiveMLGCoreDecomposition(MultiLayerGraph mlg) {
     auto vectorsQueue = queue<CoreVector>{};
     auto computedVector = set<CoreVector, CVCompartor>{};
     auto inactiveNodes = queue<int>{};
-    int ** nodeToLayerDegree;
+    int **nodeToLayerDegree;
     for (int j = 0; j < layerNum; j++) {
         auto vector = kCoreVector.build_descendant_vector(j);
         vectorsQueue.push(vector);
@@ -104,6 +165,92 @@ void naiveMLGCoreDecomposition(MultiLayerGraph mlg) {
     AlgoTimer.endTimer();
     std::cout << "Naive Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
     std::cout << "core number: " << NumberOfCores << endl;
+    coreSet.printCore();
+}
+
+void bfsMLGCoreDecomposition(MultiLayerGraph mlg) {
+    Timer AlgoTimer{};
+    AlgoTimer.startTimer();
+    int layerNum = mlg.getLayerNum();
+    int nodeNum = mlg.getNodeNum();
+    int numberOfComputedCores = 0;
+
+    auto degreeList = mlg.getDegreeList();
+    CoreVector startVector = *new CoreVector(layerNum);
+    auto nodeSet = new set<int>{};
+    for (int j = 0; j < nodeNum; j++) {
+        nodeSet->insert(j);
+    }
+
+    // core[0]
+    int NumberOfCores = 0;
+    Core coreSet = *new Core(mlg.getLayerNum());
+    coreSet.addCore(startVector, *nodeSet);
+
+    // initialize
+    auto vectorsQueue = queue<CoreVector>{};
+    auto ancestors = map<CoreVector, vector<CoreVector>, CVCompartor>{};
+    for (int j = 0; j < layerNum; j++) {
+        auto tempVector = startVector.build_descendant_vector(j);
+        vectorsQueue.push(tempVector);
+        auto fatherVectors = vector<CoreVector>{startVector};
+        ancestors.insert(pair<CoreVector, vector<CoreVector>>(tempVector, fatherVectors));
+    }
+    auto descendant_count = map<CoreVector, int, CVCompartor>{};
+    descendant_count.insert(pair<CoreVector, int>(startVector, layerNum));
+
+    while (!vectorsQueue.empty()) {
+        auto outQueueVector = vectorsQueue.front();
+        vectorsQueue.pop();
+        int numberOfNonZeroIndexes = outQueueVector.get_non_zero_index();
+        int numberOfAncestors = int(ancestors.find(outQueueVector)->second.size());
+        if (numberOfAncestors == numberOfNonZeroIndexes) {
+            auto ancestorsVector = ancestors.find(outQueueVector)->second;
+            auto ancestor0 = ancestorsVector.front();
+            auto intersect = coreSet.getCore(ancestor0);
+            decrementDescendantCount(ancestor0, &descendant_count);
+            for (int j = 1; j < ancestorsVector.size(); j++) {
+                auto tempCV = ancestorsVector[j];
+                auto s = coreSet.getCore(tempCV);
+                set_intersection(intersect.begin(), intersect.end(), s.begin(), s.end(),
+                                 inserter(intersect, intersect.begin()));
+                decrementDescendantCount(tempCV, &descendant_count);
+            }
+            if (!intersect.empty()) {
+                // compute kcore on intersect
+                nodeSet = kCore(mlg, intersect, layerNum, nodeNum, outQueueVector);
+                numberOfComputedCores += 1;
+            } else {
+                ancestors.erase(outQueueVector);
+                continue;
+            }
+            if (!nodeSet->empty()) {
+                coreSet.addCore(outQueueVector, *nodeSet);
+                for (int j = 0; j < layerNum; j++) {
+                    auto tempVector = outQueueVector.build_descendant_vector(j);
+                    if (ancestors.count(tempVector) > 0) {
+                        ancestors.find(tempVector)->second.push_back(outQueueVector);
+                    } else {
+                        vectorsQueue.push(tempVector);
+                        auto fatherVectors = vector<CoreVector>{outQueueVector};
+                        ancestors.insert(pair<CoreVector, vector<CoreVector>>(tempVector, fatherVectors));
+                    }
+                    int count = descendant_count.find(outQueueVector)->second;
+                    descendant_count.erase(outQueueVector);
+                    descendant_count.insert(pair<CoreVector, int>(outQueueVector, count + 1));
+                }
+            }
+
+        } else {
+            for (auto ancestorCV: ancestors.find(outQueueVector)->second) {
+                decrementDescendantCount(ancestorCV, &descendant_count);
+            }
+        }
+        ancestors.erase(outQueueVector);
+    }
+    AlgoTimer.endTimer();
+    std::cout << "Naive Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
+    std::cout << "core number: " << numberOfComputedCores << endl;
     coreSet.printCore();
 }
 
