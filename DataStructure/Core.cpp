@@ -4,6 +4,7 @@
 
 #include "Core.h"
 #include <iostream>
+#include <fstream>
 
 Core::Core(int _layerNum) {
     layerNum = _layerNum;
@@ -23,31 +24,31 @@ set<int> Core::getCore(CoreVector cv) {
 }
 
 void Core::printCore() {
+    ofstream out("../cores.txt");
     map<CoreVector, set<int>>::iterator iter;
     iter = kCoreMap.begin();
-    cout << "===Below is core===" << endl;
-    cout << "output cores: " << kCoreMap.size() << endl;
+    out << "===Below is core===" << endl;
+    out << "output cores: " << kCoreMap.size() << endl;
     while (iter != kCoreMap.end()) {
         auto kCoreVector = iter->first;
         auto nodesInCore = iter->second;
         string str;
-        cout << "(";
+        out << "(";
         for (int j = 0; j < layerNum; j++) {
             if (j != layerNum - 1) {
-                cout << to_string(kCoreVector.vec[j]) << ", ";
+                out << to_string(kCoreVector.vec[j]) << ", ";
             } else {
-                cout << to_string(kCoreVector.vec[j]);
+                out << to_string(kCoreVector.vec[j]);
             }
         }
-        cout << ") " << nodesInCore.size() << "\t";
-//        cout << endl;
-        cout << "Nodes: ";
+        out << ") " << nodesInCore.size() << "\t";
+        out << "Nodes: ";
         for (int iterNode: nodesInCore)
-            cout << iterNode << " ";
-        cout << endl;
+            out << iterNode << " ";
+        out << endl;
         iter++;
     }
-    cout << "===Core end===" << endl;
+    out << "===Core end===" << endl;
 }
 
 

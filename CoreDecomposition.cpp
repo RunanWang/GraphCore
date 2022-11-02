@@ -3,6 +3,8 @@
 //
 #include <queue>
 #include <set>
+#include <map>
+#include <algorithm>
 #include "CoreDecomposition.h"
 #include "Utils/Timer.h"
 #include "Utils/out.h"
@@ -12,57 +14,237 @@
 using namespace std;
 
 set<int> *kCore(MultiLayerGraph mlg, const set<int> &intersect, int layerNum, int NodeNum, CoreVector outQueueVector) {
+    auto nodeSet = new set<int>{};
+    int intersectNodeNum = int(intersect.size());
+    int *inactiveNodesList = new int[intersectNodeNum + 1];
+    int inactiveNodeNum = 0;
+    int *intersectList = new int[intersectNodeNum];
+    bool *active = new bool[NodeNum];
+    bool *inNodeSet = new bool[NodeNum];
     int **nodeToLayerDegree;
-    auto inactiveNodes = queue<int>{};
     nodeToLayerDegree = new int *[NodeNum];
-    for (int tempNode: intersect) {
+    for (int tempNode = 0; tempNode < NodeNum; tempNode++) {
+        active[tempNode] = false;
+        inNodeSet[tempNode] = false;
         nodeToLayerDegree[tempNode] = new int[layerNum];
+    }
+    int j = 0;
+    for (auto tempNode: intersect) {
+        active[tempNode] = true;
+        intersectList[j] = tempNode;
+        j += 1;
+    }
+
+    for (j = 0; j < intersectNodeNum; j++) {
+        auto tempNode = intersectList[j];
+        bool inCore = true;
         for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
             int tempDegree = 0;
             auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(tempNode);
             for (auto neighborVertex: neighborVector) {
-                if (intersect.count(neighborVertex) > 0) {
+                if (active[neighborVertex]) {
                     tempDegree += 1;
                 }
             }
             nodeToLayerDegree[tempNode][tempLayer] = tempDegree;
-        }
-    }
-    auto nodeSet = new set<int>{};
-    for (int tempNode: intersect) {
-        bool inCore = true;
-        for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
-            if (nodeToLayerDegree[tempNode][tempLayer] < outQueueVector.vec[tempLayer]) {
+            if (tempDegree < outQueueVector.vec[tempLayer]) {
                 inCore = false;
             }
         }
+
         if (inCore) {
-            nodeSet->insert(tempNode);
+            inNodeSet[tempNode] = true;
         } else {
-            inactiveNodes.push(tempNode);
-            while (!inactiveNodes.empty()) {
-                auto toPeelVertex = inactiveNodes.front();
-                inactiveNodes.pop();
+            active[tempNode] = false;
+            inactiveNodeNum += 1;
+            inactiveNodesList[inactiveNodeNum] = tempNode;
+
+            while (inactiveNodeNum > 0) {
+                auto toPeelVertex = inactiveNodesList[inactiveNodeNum];
+                inactiveNodeNum -= 1;
                 for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
                     auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(toPeelVertex);
                     for (auto neighborVertex: neighborVector) {
-                        if (intersect.count(neighborVertex) == 0) continue;
+                        if (!inNodeSet[neighborVertex]) continue;
                         nodeToLayerDegree[neighborVertex][tempLayer] -= 1;
                         if (nodeToLayerDegree[neighborVertex][tempLayer] < outQueueVector.vec[tempLayer] and
-                            nodeSet->count(neighborVertex)) {
-                            nodeSet->erase(neighborVertex);
-                            inactiveNodes.push(neighborVertex);
+                            inNodeSet[neighborVertex]) {
+                            inactiveNodeNum += 1;
+                            inactiveNodesList[inactiveNodeNum] = neighborVertex;
+                            active[neighborVertex] = false;
+                            inNodeSet[neighborVertex] = false;
                         }
                     }
                 }
             }
         }
     }
-    for (int tempNode: intersect) {
+
+    for (int tempNode = 0; tempNode < NodeNum; tempNode++) {
+        if (inNodeSet[tempNode]) nodeSet->insert(tempNode);
         delete nodeToLayerDegree[tempNode];
     }
     delete nodeToLayerDegree;
+    delete[] active;
+    delete[] inNodeSet;
+    delete[] inactiveNodesList;
     return nodeSet;
+}
+
+map<CoreVector, set<int>, CVCompartor>
+coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &nodes) {
+    // 这个函数是一个peeling思路的函数，会保证除baseLayer以外的全部core-number为CoreVector中的number，
+    // 只有baseLayer对应的那个core-number在不断变化。输入的nodes是参与的所有点，可以用来剪去那些不会影响结果的点。
+    // 输出的结果是一个map，里面存（CoreVector，对应点集）
+
+    // 声明
+    int layerNum = mlg.getLayerNum();
+    int nodeNum = mlg.getNodeNum();
+    int baseLayerMaxDegree = mlg.getGraphList()[baseLayer].getMaxDeg();
+    int currentCoreNum = int(nodes.size());
+    auto currentCore = set<int>{};                          // 当前剩余的点集，peeling的时候会不断减少
+    bool *inCurrentCore = new bool[nodeNum];                // 由于set的操作时间太久，我们用一个bool数组来表示
+    int **layerNodeDegree;                                  // 维护目前的peeling子图中，每个点的degree
+    // 以下是peeling用的bucket
+    int *degreeBucket = new int[currentCoreNum + 1];        // 类似单层图peeling的实现，我们用一个数组加index来实现桶
+    int *vertexToOrderIndex = new int[nodeNum];             // 简称Index，Order[Index[vertex]] = vertex
+    int *degreeToFirstIndex = new int[baseLayerMaxDegree];  // 简称First，First[i]表示第一个度数为i的点在Order数组中的index
+    int *coreNumList = new int[nodeNum];                    // 暂存core-num，最后恢复core
+    map<CoreVector, set<int>, CVCompartor> ans = map<CoreVector, set<int>, CVCompartor>{};
+
+    // 初始时子图所有点都在core中
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        inCurrentCore[tempNode] = true;
+    }
+    for (int tempNode = 0; tempNode < baseLayerMaxDegree; tempNode++) {
+        degreeToFirstIndex[tempNode] = 0;
+    }
+    // 算出当前子图的layer-degree，并统计得到First
+    layerNodeDegree = new int *[layerNum];
+    for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+        layerNodeDegree[tempLayer] = new int[nodeNum];
+    }
+    for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+        int tempDegree = 0;
+        for (auto tempNode: nodes) {
+            auto neighborList = mlg.getGraphList()[tempLayer].getNeighbor(tempNode);
+            for (auto neighborVertex: neighborList) {
+                if (inCurrentCore[neighborVertex]) {
+                    tempDegree++;
+                }
+            }
+            if (tempLayer == baseLayer) {
+                degreeToFirstIndex[tempDegree] += 1;
+            }
+            layerNodeDegree[tempLayer][tempNode] = tempDegree;
+        }
+    }
+    // 然后计算出每个度数对应对第一个vertex的index
+    for (int j = baseLayerMaxDegree; j > 0; j--) {
+        degreeToFirstIndex[j] = degreeToFirstIndex[j - 1];
+    }
+    degreeToFirstIndex[0] = 0;
+    for (int j = 1; j < baseLayerMaxDegree + 1; j++) {
+        degreeToFirstIndex[j] += degreeToFirstIndex[j - 1];
+    }
+    // 最后根据index，扫描一边全部的点，把点放到index指示的为止上
+    for (auto tempNode: nodes) {
+        int degree = layerNodeDegree[baseLayer][tempNode];
+        int index = degreeToFirstIndex[degree];
+        degreeBucket[index] = tempNode;
+        vertexToOrderIndex[tempNode] = index;
+        degreeToFirstIndex[degree] += 1;
+    }
+    // 还原degreeCount
+    for (int j = baseLayerMaxDegree; j > 0; j--) {
+        degreeToFirstIndex[j] = degreeToFirstIndex[j - 1];
+    }
+    degreeToFirstIndex[0] = 0;
+
+    int nowCoreNum = 0;
+    // 开始peeling
+    for (int j = 0; j < currentCoreNum; j++) {
+        // 选出目前degree最小的点toPeelVertex
+        auto toPeelVertex = degreeBucket[j];
+        inCurrentCore[toPeelVertex] = false;
+        // toPeelVertex点度数是toPeelVertex的core-num
+        if (nowCoreNum != layerNodeDegree[baseLayer][toPeelVertex] and nowCoreNum != 0) {
+            CoreVector newCV = *new CoreVector{cv.vec, cv.length};
+            newCV.vec[baseLayer] = nowCoreNum;
+            set<int> initSet = set<int>{};
+            for (auto tempNode: nodes) {
+                if (inCurrentCore[tempNode]) {
+                    initSet.insert(tempNode);
+                }
+            }
+            ans.insert(pair<CoreVector, set<int>>{newCV, initSet});
+        }
+        nowCoreNum = layerNodeDegree[baseLayer][toPeelVertex];
+        coreNumList[toPeelVertex] = layerNodeDegree[baseLayer][toPeelVertex];
+        // 寻找toPeelVertex的全部邻居
+        for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+            if (tempLayer == baseLayer) {
+                // 本层的边，直接peeling
+                auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(toPeelVertex);
+                for (auto neighborVertex: neighborVector) {
+                    // 对于比toPeelVertex度数大的邻居进行更新
+                    // 需要更新Order、First、Index三个数组和DegreeList
+                    if (layerNodeDegree[baseLayer][neighborVertex] > nowCoreNum) {
+                        // 首先更新Order：邻居点的Degree要-1，那么我们可以把邻居点和Degree的首个点交换位置，再把对应点First+1
+                        int neighborVDegree = layerNodeDegree[baseLayer][neighborVertex];
+                        int toSwapU = vertexToOrderIndex[neighborVertex];   // 找到邻居点在Order中的index-toSwapU
+                        int toSwapV = degreeToFirstIndex[neighborVDegree];  // 找到邻居对应度数在Order中的index-toSwapV
+                        // 交换toSwapU和toSwapV，这时邻居点已经被移到degree-1的最后
+                        auto temp = degreeBucket[toSwapV];
+                        degreeBucket[toSwapV] = degreeBucket[toSwapU];
+                        degreeBucket[toSwapU] = temp;
+                        // 更新Index：把交换位置的两个点的index也互相交换
+                        vertexToOrderIndex[temp] = toSwapU;
+                        vertexToOrderIndex[neighborVertex] = toSwapV;
+                        // 更新First：这时邻居点已经被移到First[neighborVDegree]的位置上
+                        // First[neighborVDegree] + 1，使邻居点划入neighborVDegree - 1中
+                        degreeToFirstIndex[neighborVDegree] += 1;
+                        // 更新DegreeList：这个邻居的度数-1
+                        layerNodeDegree[baseLayer][neighborVertex] -= 1;
+                    }
+                }
+            } else {
+                // 外层的边，检查是否满足cv，不满足也要peeling
+                auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(toPeelVertex);
+                for (auto neighborVertex: neighborVector) {
+                    auto toPeelVertexDegree = layerNodeDegree[tempLayer][neighborVertex];
+                    if (toPeelVertexDegree >= cv.vec[tempLayer]) {
+                        layerNodeDegree[tempLayer][neighborVertex] -= 1;
+                        // 如果peel掉这个点之后，neighborVertex不满足cv了，要把这个点挪到现在的nowCoreNum下，等待peel
+                        if (toPeelVertexDegree < cv.vec[tempLayer]) {
+                            // 首先更新Order：邻居点的Degree要-1，那么我们可以把邻居点和Degree的首个点交换位置，再把对应点First+1
+                            int neighborVDegree = layerNodeDegree[baseLayer][neighborVertex];
+                            while (neighborVDegree != nowCoreNum) {
+                                int toSwapU = vertexToOrderIndex[neighborVertex];   // 找到邻居点在Order中的index-toSwapU
+                                int toSwapV = degreeToFirstIndex[neighborVDegree];  // 找到邻居对应度数在Order中的index-toSwapV
+                                // 交换toSwapU和toSwapV，这时邻居点已经被移到degree-1的最后
+                                auto temp = degreeBucket[toSwapV];
+                                degreeBucket[toSwapV] = degreeBucket[toSwapU];
+                                degreeBucket[toSwapU] = temp;
+                                // 更新Index：把交换位置的两个点的index也互相交换
+                                vertexToOrderIndex[temp] = toSwapU;
+                                vertexToOrderIndex[neighborVertex] = toSwapV;
+                                // 更新First：这时邻居点已经被移到First[neighborVDegree]的位置上
+                                // First[neighborVDegree] + 1，使邻居点划入neighborVDegree - 1中
+                                degreeToFirstIndex[neighborVDegree] += 1;
+                                // 更新DegreeList：这个邻居的度数-1
+                                layerNodeDegree[baseLayer][neighborVertex] -= 1;
+                                neighborVDegree = layerNodeDegree[baseLayer][neighborVertex];
+                            }
+
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+    return ans;
 }
 
 void decrementDescendantCount(CoreVector cv, map<CoreVector, int, CVCompartor> *descendant_count) {
@@ -175,7 +357,6 @@ void bfsMLGCoreDecomposition(MultiLayerGraph mlg) {
     int nodeNum = mlg.getNodeNum();
     int numberOfComputedCores = 0;
 
-    auto degreeList = mlg.getDegreeList();
     CoreVector startVector = *new CoreVector(layerNum);
     auto nodeSet = new set<int>{};
     for (int j = 0; j < nodeNum; j++) {
@@ -249,8 +430,91 @@ void bfsMLGCoreDecomposition(MultiLayerGraph mlg) {
         ancestors.erase(outQueueVector);
     }
     AlgoTimer.endTimer();
-    std::cout << "Naive Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
-    std::cout << "core number: " << numberOfComputedCores << endl;
+    std::cout << "BFS Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
+    std::cout << "Computed core number: " << numberOfComputedCores << endl;
+    std::cout << "Core number: " << coreSet.getSize() << endl;
+    coreSet.printCore();
+}
+
+void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
+    Timer AlgoTimer{};
+    AlgoTimer.startTimer();
+    int layerNum = mlg.getLayerNum();
+    int nodeNum = mlg.getNodeNum();
+    int numberOfComputedCores = 0;
+
+    CoreVector startVector = *new CoreVector(layerNum);
+    auto nodeSet = new set<int>{};
+    for (int j = 0; j < nodeNum; j++) {
+        nodeSet->insert(j);
+    }
+
+    // core[0]
+    int NumberOfCores = 0;
+    Core coreSet = *new Core(mlg.getLayerNum());
+    coreSet.addCore(startVector, *nodeSet);
+
+    // initialize
+    auto layerSet = set<int>{};
+    auto baseLayerSet = set<int>{};
+    for (int j = 0; j < layerNum; j++) {
+        layerSet.insert(j);
+        baseLayerSet.insert(j);
+    }
+    set<int> initSet = set<int>{};
+    for (int i = 0; i < nodeNum; ++i) {
+        initSet.insert(i);
+    }
+    map<CoreVector, set<int>, CVCompartor> baseCores = map<CoreVector, set<int>, CVCompartor>{};
+    baseCores.insert(pair<CoreVector, set<int>>{startVector, initSet});
+
+    auto computedCoreVectors = set<CoreVector, CVCompartor>{startVector};
+
+    while (!baseLayerSet.empty()) {
+        baseLayerSet.erase(baseLayerSet.begin());
+        auto tempBaseCores = map<CoreVector, set<int>, CVCompartor>{};
+        map<CoreVector, set<int>>::iterator iter;
+        iter = baseCores.begin();
+        while (iter != baseCores.end()) {
+            for (auto baseLayer: baseLayerSet) {
+                if (iter->first.vec[baseLayer] == 0) {
+                    auto newCores = coreDecomposition(mlg, iter->first, baseLayer, iter->second);
+                    map<CoreVector, set<int>>::iterator iter2;
+                    iter2 = newCores.begin();
+                    while (iter2 != newCores.end()) {
+                        coreSet.addCore(iter2->first, iter2->second);
+                        tempBaseCores.insert(pair<CoreVector, set<int>>{iter2->first, iter2->second});
+                    }
+                    numberOfComputedCores += int(newCores.size());
+                }
+            }
+            auto addLayerSet = set<int>{};
+            for (auto baseLayer: layerSet) {
+                if (baseLayerSet.count(baseLayer)==0){
+                    addLayerSet.insert(baseLayer);
+                }
+            }
+            for (auto baseLayer: addLayerSet) {
+                if (iter->first.vec[baseLayer] == 0) {
+                    auto newCores = coreDecomposition(mlg, iter->first, baseLayer, iter->second);
+                    map<CoreVector, set<int>>::iterator iter2;
+                    iter2 = newCores.begin();
+                    while (iter2 != newCores.end()) {
+                        coreSet.addCore(iter2->first, iter2->second);
+                        tempBaseCores.insert(pair<CoreVector, set<int>>{iter2->first, iter2->second});
+                    }
+                    numberOfComputedCores += int(newCores.size());
+                }
+            }
+            iter++;
+        }
+        baseCores = tempBaseCores;
+    }
+
+    AlgoTimer.endTimer();
+    std::cout << "BFS Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
+    std::cout << "Computed core number: " << numberOfComputedCores << endl;
+    std::cout << "Core number: " << coreSet.getSize() << endl;
     coreSet.printCore();
 }
 
