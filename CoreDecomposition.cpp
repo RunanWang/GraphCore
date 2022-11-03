@@ -318,11 +318,10 @@ coreDecompositionDS(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> 
     bucketIter = coreNumToNodesBucket.begin();
     while (bucketIter != coreNumToNodesBucket.end()) {
         auto index = bucketIter->first;
-        auto nodesVector = bucketIter->second;
-        while (!nodesVector.empty()) {
-            int tempNode = nodesVector.front();
-            auto k = nodesVector.begin();
-            nodesVector.erase(k);
+        while (!bucketIter->second.empty()) {
+            int tempNode = bucketIter->second.front();
+            auto k = bucketIter->second.begin();
+            bucketIter->second.erase(k);
             inCurrentCore[tempNode] = false;
             currentCoreSize -= 1;
 
@@ -333,20 +332,22 @@ coreDecompositionDS(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> 
                         int neighborVertexDegree = layerNodeDegree[tempLayer][neighborVertex];
 
                         if (tempLayer == baseLayer and neighborVertexDegree > index) {
-                            auto toRemoveVec = coreNumToNodesBucket.find(neighborVertexDegree)->second;
-                            k = std::find(toRemoveVec.begin(), toRemoveVec.end(), neighborVertex);
-                            toRemoveVec.erase(k);
+                            k = std::find(coreNumToNodesBucket.find(neighborVertexDegree)->second.begin(),
+                                          coreNumToNodesBucket.find(neighborVertexDegree)->second.end(),
+                                          neighborVertex);
+                            coreNumToNodesBucket.find(neighborVertexDegree)->second.erase(k);
                             coreNumToNodesBucket.find(neighborVertexDegree - 1)->second.push_back(neighborVertex);
                             layerNodeDegree[tempLayer][neighborVertex] -= 1;
-                        } else if (tempLayer != baseLayer and neighborVertexDegree > cv.vec[tempLayer]) {
+                        } else if (tempLayer != baseLayer and neighborVertexDegree >= cv.vec[tempLayer]) {
                             layerNodeDegree[tempLayer][neighborVertex] -= 1;
                             if (layerNodeDegree[tempLayer][neighborVertex] < cv.vec[tempLayer]) {
                                 int toFindDegree = layerNodeDegree[baseLayer][neighborVertex];
-                                auto toRemoveVec = coreNumToNodesBucket.find(toFindDegree)->second;
-                                k = std::find(toRemoveVec.begin(), toRemoveVec.end(), neighborVertex);
-                                toRemoveVec.erase(k);
+                                k = std::find(coreNumToNodesBucket.find(toFindDegree)->second.begin(),
+                                              coreNumToNodesBucket.find(toFindDegree)->second.end(),
+                                              neighborVertex);
+                                coreNumToNodesBucket.find(toFindDegree)->second.erase(k);
                                 coreNumToNodesBucket.find(index)->second.push_back(neighborVertex);
-                                layerNodeDegree[tempLayer][neighborVertex] = index;
+                                layerNodeDegree[baseLayer][neighborVertex] = index;
                             }
                         }
                     }
@@ -624,7 +625,7 @@ void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
             }
             for (auto baseLayer: addLayerSet) {
                 if (iter->first.vec[baseLayer] == 0) {
-                    auto newCores = coreDecomposition(mlg, iter->first, baseLayer, iter->second);
+                    auto newCores = coreDecompositionDS(mlg, iter->first, baseLayer, iter->second);
                     map<CoreVector, set<int>>::iterator iter2;
                     iter2 = newCores.begin();
                     while (iter2 != newCores.end()) {
@@ -646,6 +647,8 @@ void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
     std::cout << "Core number: " << coreSet.getSize() << endl;
     coreSet.printCore();
 }
+
+
 
 int *peelingCoreDecomposition(Graph g, bool printResult) {
     int nodeNum = g.getNodeNum();
