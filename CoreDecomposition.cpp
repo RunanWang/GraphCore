@@ -112,8 +112,11 @@ coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &n
     int *coreNumList = new int[nodeNum];                    // 暂存core-num，最后恢复core
     map<CoreVector, set<int>, CVCompartor> ans = map<CoreVector, set<int>, CVCompartor>{};
 
-    // 初始时子图所有点都在core中
+    // 初始时子图所有点都在core中，非子图中点不在core中
     for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        inCurrentCore[tempNode] = false;
+    }
+    for(int tempNode: nodes){
         inCurrentCore[tempNode] = true;
     }
     for (int tempNode = 0; tempNode < baseLayerMaxDegree; tempNode++) {
@@ -125,8 +128,8 @@ coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &n
         layerNodeDegree[tempLayer] = new int[nodeNum];
     }
     for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
-        int tempDegree = 0;
         for (auto tempNode: nodes) {
+            int tempDegree = 0;
             auto neighborList = mlg.getGraphList()[tempLayer].getNeighbor(tempNode);
             for (auto neighborVertex: neighborList) {
                 if (inCurrentCore[neighborVertex]) {
@@ -166,11 +169,11 @@ coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &n
     for (int j = 0; j < currentCoreNum; j++) {
         // 选出目前degree最小的点toPeelVertex
         auto toPeelVertex = degreeBucket[j];
-        inCurrentCore[toPeelVertex] = false;
+
         // toPeelVertex点度数是toPeelVertex的core-num
-        if (nowCoreNum != layerNodeDegree[baseLayer][toPeelVertex] and nowCoreNum != 0) {
+        while (nowCoreNum != layerNodeDegree[baseLayer][toPeelVertex]) {
             CoreVector newCV = *new CoreVector{cv.vec, cv.length};
-            newCV.vec[baseLayer] = nowCoreNum;
+            newCV.vec[baseLayer] = nowCoreNum + 1;
             set<int> initSet = set<int>{};
             for (auto tempNode: nodes) {
                 if (inCurrentCore[tempNode]) {
@@ -178,7 +181,9 @@ coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &n
                 }
             }
             ans.insert(pair<CoreVector, set<int>>{newCV, initSet});
+            nowCoreNum += 1;
         }
+        inCurrentCore[toPeelVertex] = false;
         nowCoreNum = layerNodeDegree[baseLayer][toPeelVertex];
         coreNumList[toPeelVertex] = layerNodeDegree[baseLayer][toPeelVertex];
         // 寻找toPeelVertex的全部邻居
@@ -212,11 +217,14 @@ coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &n
                 // 外层的边，检查是否满足cv，不满足也要peeling
                 auto neighborVector = mlg.getGraphList()[tempLayer].getNeighbor(toPeelVertex);
                 for (auto neighborVertex: neighborVector) {
+                    if (!inCurrentCore[neighborVertex]){
+                        continue;
+                    }
                     auto toPeelVertexDegree = layerNodeDegree[tempLayer][neighborVertex];
                     if (toPeelVertexDegree >= cv.vec[tempLayer]) {
                         layerNodeDegree[tempLayer][neighborVertex] -= 1;
                         // 如果peel掉这个点之后，neighborVertex不满足cv了，要把这个点挪到现在的nowCoreNum下，等待peel
-                        if (toPeelVertexDegree < cv.vec[tempLayer]) {
+                        if (layerNodeDegree[tempLayer][neighborVertex] < cv.vec[tempLayer]) {
                             // 首先更新Order：邻居点的Degree要-1，那么我们可以把邻居点和Degree的首个点交换位置，再把对应点First+1
                             int neighborVDegree = layerNodeDegree[baseLayer][neighborVertex];
                             while (neighborVDegree != nowCoreNum) {
@@ -244,6 +252,15 @@ coreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> &n
 
         }
     }
+    delete[] inCurrentCore;
+    for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+        delete layerNodeDegree[tempLayer];
+    }
+    delete layerNodeDegree;
+    delete[] degreeBucket;
+    delete[] vertexToOrderIndex;
+    delete[] degreeToFirstIndex;
+    delete[] coreNumList;
     return ans;
 }
 
@@ -484,6 +501,7 @@ void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
                     while (iter2 != newCores.end()) {
                         coreSet.addCore(iter2->first, iter2->second);
                         tempBaseCores.insert(pair<CoreVector, set<int>>{iter2->first, iter2->second});
+                        iter2 ++;
                     }
                     numberOfComputedCores += int(newCores.size());
                 }
@@ -502,6 +520,7 @@ void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
                     while (iter2 != newCores.end()) {
                         coreSet.addCore(iter2->first, iter2->second);
                         tempBaseCores.insert(pair<CoreVector, set<int>>{iter2->first, iter2->second});
+                        iter2 ++;
                     }
                     numberOfComputedCores += int(newCores.size());
                 }

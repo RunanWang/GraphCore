@@ -31,7 +31,11 @@
 *.out
 *.app
 
+# mid files
 cmake-build-debug/*
 .idea/*
 .DS_Store
 build/*
+
+# results
+*.txt

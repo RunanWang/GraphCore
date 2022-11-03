@@ -16,14 +16,14 @@ int main(int argc, char *argv[]) {
         // Load GraphCore
         loadTimer.startTimer();
         MultiLayerGraph g{};
-        g.loadGraphFromFile("../dataset/sample.txt");
+        g.loadGraphFromFile("../dataset/homo.txt");
         loadTimer.endTimer();
         std::cout << "Load Time: " << loadTimer.getTimerSecond() << "s." << std::endl;
         g.showGraphProperties();
 
         // Calculate Core on MLG
         calTimer.startTimer();
-        bfsMLGCoreDecomposition(g);
+        dfsMLGCoreDecomposition(g);
         calTimer.endTimer();
         std::cout << "Total Cal Time: " << calTimer.getTimerSecond() << "s." << std::endl;
     } else if (strncmp("sg", graphType, 2) != 0) {

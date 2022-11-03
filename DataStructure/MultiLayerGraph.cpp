@@ -13,6 +13,7 @@ void MultiLayerGraph::loadGraphFromFile(const string &filename) {
     ifstream fin;
     fin.open(filename);
     fin >> layerNum >> nodeNum >> edgeNum;
+    cout << "MLG has " << layerNum << " layers and " << nodeNum << " nodes and " << edgeNum << " edges." << endl;
     GraphList = new Graph[layerNum];
     for (int j = 0; j < layerNum; j++) {
         GraphList[j].setNode(nodeNum);
@@ -26,7 +27,6 @@ void MultiLayerGraph::loadGraphFromFile(const string &filename) {
 
 void MultiLayerGraph::showGraphProperties() {
     cout << "===MLG Properties===" << endl;
-    cout << "MLG has " << layerNum << " layers and " << nodeNum << " nodes." << endl;
     for (int j = 0; j < layerNum; j++) {
         cout << "In Layer " << j << ": ";
         GraphList[j].showGraphProperties();
