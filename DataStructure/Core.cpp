@@ -23,6 +23,10 @@ set<int> Core::getCore(CoreVector cv) {
     return kCoreMap.find(cv)->second;
 }
 
+bool Core::hasCore(CoreVector cv) {
+    return (kCoreMap.count(cv) != 0);
+}
+
 void Core::printCore() {
     ofstream out("../cores.txt");
     map<CoreVector, set<int>>::iterator iter;
@@ -50,6 +54,8 @@ void Core::printCore() {
     }
     out << "===Core end===" << endl;
 }
+
+
 
 
 

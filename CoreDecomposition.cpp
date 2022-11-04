@@ -13,7 +13,8 @@
 
 using namespace std;
 
-set<int> *kCore(MultiLayerGraph mlg, const set<int> &intersect, int layerNum, int NodeNum, CoreVector outQueueVector) {
+set<int> *kCore(MultiLayerGraph mlg, const set<int> &intersect, int layerNum, int NodeNum, CoreVector outQueueVector,
+                int *hybrid) {
     auto nodeSet = new set<int>{};
     int intersectNodeNum = int(intersect.size());
     int *inactiveNodesList = new int[intersectNodeNum + 1];
@@ -79,9 +80,18 @@ set<int> *kCore(MultiLayerGraph mlg, const set<int> &intersect, int layerNum, in
             }
         }
     }
-
     for (int tempNode = 0; tempNode < NodeNum; tempNode++) {
         if (inNodeSet[tempNode]) nodeSet->insert(tempNode);
+    }
+    for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+        hybrid[tempLayer] = INT32_MAX;
+        for (auto tempNode: *nodeSet) {
+            if (hybrid[tempLayer] > nodeToLayerDegree[tempNode][tempLayer]) {
+                hybrid[tempLayer] = nodeToLayerDegree[tempNode][tempLayer];
+            }
+        }
+    }
+    for (int tempNode = 0; tempNode < NodeNum; tempNode++) {
         delete nodeToLayerDegree[tempNode];
     }
     delete nodeToLayerDegree;
@@ -375,6 +385,102 @@ coreDecompositionDS(MultiLayerGraph mlg, CoreVector cv, int baseLayer, set<int> 
     return ans;
 }
 
+map<CoreVector, set<int>, CVCompartor>
+pureCoreDecomposition(MultiLayerGraph mlg, CoreVector cv, int baseLayer) {
+    int layerNum = mlg.getLayerNum();
+    int nodeNum = mlg.getNodeNum();
+    int currentCoreSize = nodeNum;
+    int baseLayerMaxDegree = mlg.getGraphList()[baseLayer].getMaxDeg() + 1;
+    bool *inCurrentCore = new bool[nodeNum];                // 由于set的操作时间太久，我们用一个bool数组来表示
+    int *baseLayerNodeDegree = new int[nodeNum];            // 维护目前的peeling子图中，每个点的degree
+    map<int, vector<int>> coreNumToNodesBucket = *new map<int, vector<int>>{};
+    map<CoreVector, set<int>, CVCompartor> ans = map<CoreVector, set<int>, CVCompartor>{};
+
+    for (int j = 0; j < baseLayerMaxDegree; j++) {
+        auto v = *new vector<int>{};
+        coreNumToNodesBucket.insert(pair<int, vector<int>>{j, v});
+    }
+
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        inCurrentCore[tempNode] = true;
+    }
+    // 算出当前子图的layer-degree
+    auto tempBaseLayerNodeDegree = mlg.getGraphList()[baseLayer].getNodeDegreeList();
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        int tempDegree = tempBaseLayerNodeDegree[tempNode];
+        baseLayerNodeDegree[tempNode] = tempDegree;
+        coreNumToNodesBucket.find(tempDegree)->second.push_back(tempNode);
+    }
+
+    map<int, vector<int>>::iterator bucketIter;
+    bucketIter = coreNumToNodesBucket.begin();
+    while (bucketIter != coreNumToNodesBucket.end()) {
+        auto index = bucketIter->first;
+        while (!bucketIter->second.empty()) {
+            int tempNode = bucketIter->second.front();
+            auto k = bucketIter->second.begin();
+            bucketIter->second.erase(k);
+            inCurrentCore[tempNode] = false;
+            currentCoreSize -= 1;
+
+            auto neighborVector = mlg.getGraphList()[baseLayer].getNeighbor(tempNode);
+            for (auto neighborVertex: neighborVector) {
+                if (inCurrentCore[neighborVertex] and baseLayerNodeDegree[neighborVertex] > index) {
+                    int neighborVertexDegree = baseLayerNodeDegree[neighborVertex];
+                    k = std::find(coreNumToNodesBucket.find(neighborVertexDegree)->second.begin(),
+                                  coreNumToNodesBucket.find(neighborVertexDegree)->second.end(),
+                                  neighborVertex);
+                    coreNumToNodesBucket.find(neighborVertexDegree)->second.erase(k);
+                    coreNumToNodesBucket.find(neighborVertexDegree - 1)->second.push_back(neighborVertex);
+                    baseLayerNodeDegree[neighborVertex] -= 1;
+                }
+            }
+        }
+
+        if (currentCoreSize > 0) {
+            CoreVector newCV = *new CoreVector{cv.vec, cv.length};
+            newCV.vec[baseLayer] = index + 1;
+            set<int> initSet = set<int>{};
+            for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+                if (inCurrentCore[tempNode]) {
+                    initSet.insert(tempNode);
+                }
+            }
+            ans.insert(pair<CoreVector, set<int>>{newCV, initSet});
+        }
+        bucketIter++;
+    }
+    delete[] inCurrentCore;
+    delete[] baseLayerNodeDegree;
+    return ans;
+}
+
+void bottomUpVisit(CoreVector startVector, CoreVector endVector, int layerNum, Core &core) {
+    auto CVQueue = new queue<CoreVector>{};
+    CVQueue->push(startVector);
+    auto processedCV = new set<CoreVector, CVCompartor>{};
+    processedCV->insert(startVector);
+    auto newSet = core.getCore(endVector);
+
+    while (!CVQueue->empty()) {
+        auto tempCV = CVQueue->front();
+        CVQueue->pop();
+        if (!core.hasCore(tempCV)) {
+            core.addCore(tempCV, newSet);
+        }
+
+        for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+            if (tempCV.vec[tempLayer] > (endVector.vec[tempLayer] + 1)) {
+                auto ancestorVector = tempCV.build_ancestor_vector(tempLayer);
+                if (!core.hasCore(ancestorVector) and processedCV->count(ancestorVector) == 0) {
+                    CVQueue->push(ancestorVector);
+                    processedCV->insert(ancestorVector);
+                }
+            }
+        }
+    }
+}
+
 void decrementDescendantCount(CoreVector cv, map<CoreVector, int, CVCompartor> *descendant_count) {
     int count = descendant_count->find(cv)->second;
     descendant_count->erase(cv);
@@ -484,6 +590,7 @@ void bfsMLGCoreDecomposition(MultiLayerGraph mlg) {
     int layerNum = mlg.getLayerNum();
     int nodeNum = mlg.getNodeNum();
     int numberOfComputedCores = 0;
+    int *hybrid = new int[layerNum];
 
     CoreVector startVector = *new CoreVector(layerNum);
     auto nodeSet = new set<int>{};
@@ -527,7 +634,7 @@ void bfsMLGCoreDecomposition(MultiLayerGraph mlg) {
             }
             if (!intersect.empty()) {
                 // compute kcore on intersect
-                nodeSet = kCore(mlg, intersect, layerNum, nodeNum, outQueueVector);
+                nodeSet = kCore(mlg, intersect, layerNum, nodeNum, outQueueVector, hybrid);
                 numberOfComputedCores += 1;
             } else {
                 ancestors.erase(outQueueVector);
@@ -642,13 +749,116 @@ void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
     }
 
     AlgoTimer.endTimer();
-    std::cout << "BFS Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
+    std::cout << "DFS Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
     std::cout << "Computed core number: " << numberOfComputedCores << endl;
     std::cout << "Core number: " << coreSet.getSize() << endl;
     coreSet.printCore();
 }
 
+void hybridMLGCoreDecomposition(MultiLayerGraph mlg) {
+    Timer AlgoTimer{};
+    AlgoTimer.startTimer();
+    int layerNum = mlg.getLayerNum();
+    int nodeNum = mlg.getNodeNum();
+    int numberOfComputedCores = 0;
+    int *hybrid = new int[layerNum];
 
+    CoreVector startVector = *new CoreVector(layerNum);
+    auto nodeSet = new set<int>{};
+    for (int j = 0; j < nodeNum; j++) {
+        nodeSet->insert(j);
+    }
+
+    // core[0]
+    int NumberOfCores = 0;
+    Core coreSet = *new Core(mlg.getLayerNum());
+    coreSet.addCore(startVector, *nodeSet);
+
+    auto vectorsQueue = queue<CoreVector>{};
+    auto ancestors = map<CoreVector, vector<CoreVector>, CVCompartor>{};
+    for (int j = 0; j < layerNum; j++) {
+        auto tempVector = startVector.build_descendant_vector(j);
+        vectorsQueue.push(tempVector);
+        auto fatherVectors = vector<CoreVector>{startVector};
+        ancestors.insert(pair<CoreVector, vector<CoreVector>>(tempVector, fatherVectors));
+    }
+
+    auto descendant_count = map<CoreVector, int, CVCompartor>{};
+
+    for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+        auto newCores = pureCoreDecomposition(mlg, startVector, tempLayer);
+        map<CoreVector, set<int>>::iterator iter2;
+        iter2 = newCores.begin();
+        while (iter2 != newCores.end()) {
+            coreSet.addCore(iter2->first, iter2->second);
+            iter2++;
+        }
+        numberOfComputedCores += int(newCores.size());
+    }
+
+    while (!vectorsQueue.empty()) {
+        auto outQueueVector = vectorsQueue.front();
+        vectorsQueue.pop();
+        int numberOfNonZeroIndexes = outQueueVector.get_non_zero_index();
+        int numberOfAncestors = int(ancestors.find(outQueueVector)->second.size());
+        if (numberOfAncestors == numberOfNonZeroIndexes and numberOfNonZeroIndexes > 1 and
+            not coreSet.hasCore(outQueueVector)) {
+            auto ancestorsVector = ancestors.find(outQueueVector)->second;
+            auto ancestor0 = ancestorsVector.front();
+            auto intersect = coreSet.getCore(ancestor0);
+            decrementDescendantCount(ancestor0, &descendant_count);
+            for (int j = 1; j < ancestorsVector.size(); j++) {
+                auto tempCV = ancestorsVector[j];
+                auto s = coreSet.getCore(tempCV);
+                set_intersection(intersect.begin(), intersect.end(), s.begin(), s.end(),
+                                 inserter(intersect, intersect.begin()));
+                decrementDescendantCount(tempCV, &descendant_count);
+            }
+
+            if (!intersect.empty()) {
+                nodeSet = kCore(mlg, intersect, layerNum, nodeNum, outQueueVector, hybrid);
+                numberOfComputedCores += 1;
+                if (!nodeSet->empty()) {
+                    coreSet.addCore(outQueueVector, *nodeSet);
+                    for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+                        if (hybrid[tempLayer] != outQueueVector.vec[tempLayer]) {
+                            auto *tempcv = new CoreVector(hybrid, outQueueVector.length);
+                            bottomUpVisit(*tempcv, outQueueVector, layerNum, coreSet);
+                        }
+                    }
+                }
+            }
+
+        } else {
+            for (auto ancestorCV: ancestors.find(outQueueVector)->second) {
+                decrementDescendantCount(ancestorCV, &descendant_count);
+            }
+        }
+
+        if (coreSet.hasCore(outQueueVector)) {
+            for (int tempLayer = 0; tempLayer < layerNum; tempLayer++) {
+                auto descendantVector = outQueueVector.build_descendant_vector(tempLayer);
+                auto iter = ancestors.find(descendantVector);
+                if (iter != ancestors.end()) {
+                    iter->second.push_back(outQueueVector);
+                } else {
+                    vectorsQueue.push(descendantVector);
+                    auto fatherVectors = vector<CoreVector>{outQueueVector};
+                    ancestors.insert(pair<CoreVector, vector<CoreVector>>(descendantVector, fatherVectors));
+                }
+                descendant_count.find(outQueueVector)->second++;
+            }
+        }
+
+        ancestors.erase(outQueueVector);
+    }
+
+    AlgoTimer.endTimer();
+    std::cout << "Hybrid Time: " << AlgoTimer.getTimerSecond() << " s." << std::endl;
+    std::cout << "Computed core number: " << numberOfComputedCores << endl;
+    std::cout << "Core number: " << coreSet.getSize() << endl;
+    coreSet.printCore();
+}
 
 int *peelingCoreDecomposition(Graph g, bool printResult) {
     int nodeNum = g.getNodeNum();

@@ -14,6 +14,8 @@ void bfsMLGCoreDecomposition(MultiLayerGraph mlg);
 
 void dfsMLGCoreDecomposition(MultiLayerGraph mlg);
 
+void hybridMLGCoreDecomposition(MultiLayerGraph mlg);
+
 int *peelingCoreDecomposition(Graph g, bool printResult);
 
 #endif //GRAPH_COREDECOMPOSITION_H

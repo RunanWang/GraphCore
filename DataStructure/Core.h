@@ -24,6 +24,8 @@ public:
 
     set<int> getCore(CoreVector cv);
 
+    bool hasCore(CoreVector cv);
+
 private:
     int layerNum;
     map<CoreVector, set<int>, CVCompartor> kCoreMap;

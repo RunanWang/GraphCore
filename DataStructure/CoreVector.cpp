@@ -27,6 +27,12 @@ CoreVector CoreVector::build_descendant_vector(int index) const {
     return descendant;
 }
 
+CoreVector CoreVector::build_ancestor_vector(int index) const {
+    CoreVector descendant = *new CoreVector(vec, length);
+    descendant.vec[index] -= 1;
+    return descendant;
+}
+
 int CoreVector::get_non_zero_index() const {
     int count = 0;
     for (int j = 0; j < length; j++) {

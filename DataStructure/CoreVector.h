@@ -17,6 +17,8 @@ public:
 
     CoreVector build_descendant_vector(int index) const;
 
+    CoreVector build_ancestor_vector(int index) const;
+
     int get_non_zero_index() const;
 };
 
