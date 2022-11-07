@@ -37,15 +37,8 @@ void Core::printCore() {
         auto kCoreVector = iter->first;
         auto nodesInCore = iter->second;
         string str;
-        out << "(";
-        for (int j = 0; j < layerNum; j++) {
-            if (j != layerNum - 1) {
-                out << to_string(kCoreVector.vec[j]) << ", ";
-            } else {
-                out << to_string(kCoreVector.vec[j]);
-            }
-        }
-        out << ") " << nodesInCore.size() << "\t";
+        out << kCoreVector.cvToString();
+        out << " " << nodesInCore.size() << "\t";
         out << "Nodes: ";
         for (int iterNode: nodesInCore)
             out << iterNode << " ";
@@ -55,8 +48,57 @@ void Core::printCore() {
     out << "===Core end===" << endl;
 }
 
+void Core::printCoreNum(int nodeNum) {
+    auto nodeToCoreNumVec = new map<int, CoreNum>{};
+    map<CoreVector, set<int>>::iterator iter;
+    iter = kCoreMap.begin();
+    while (iter != kCoreMap.end()) {
+        auto kCoreVector = iter->first;
+        auto nodesInCore = iter->second;
+        for (auto tempNode: nodesInCore) {
+            if (nodeToCoreNumVec->find(tempNode) != nodeToCoreNumVec->end()) {
+                nodeToCoreNumVec->find(tempNode)->second.addCoreVector(kCoreVector);
+            } else {
+                auto vc = new CoreNum{};
+                vc->addCoreVector(kCoreVector);
+                nodeToCoreNumVec->insert(pair<int, CoreNum>(tempNode, *vc));
+            }
+        }
+        iter++;
+    }
+    ofstream out("../core-num.txt");
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        out << tempNode << "\t\t";
+        out << nodeToCoreNumVec->find(tempNode)->second.toString();
+        out << endl;
+    }
+}
 
 
+void CoreNum::addCoreVector(CoreVector cv) {
+    vector<CoreVector>::iterator iter;
+    iter = this->coreNumVec.begin();
+    while (iter != this->coreNumVec.end()) {
+        if (iter->isFather(&cv)){
+            this->coreNumVec.erase(iter);
+            iter -= 1;
+        }
+        iter += 1;
+    }
+    iter = this->coreNumVec.begin();
+    while (iter != this->coreNumVec.end()) {
+        if (cv.isFather(iter.base())){
+            return;
+        }
+        iter += 1;
+    }
+    this->coreNumVec.push_back(cv);
+}
 
-
-
+string CoreNum::toString() {
+    string s;
+    for (auto tempCV: this->coreNumVec){
+        s += tempCV.cvToString() + "\t";
+    }
+    return s;
+}

@@ -5,6 +5,7 @@
 #ifndef GRAPH_CORE_H
 #define GRAPH_CORE_H
 
+#include <vector>
 #include <map>
 #include <set>
 #include "CoreVector.h"
@@ -20,6 +21,8 @@ public:
 
     void printCore();
 
+    void printCoreNum(int nodeNum);
+
     int getSize();
 
     set<int> getCore(CoreVector cv);
@@ -31,5 +34,13 @@ private:
     map<CoreVector, set<int>, CVCompartor> kCoreMap;
 };
 
+class CoreNum {
+public:
+    vector<CoreVector> coreNumVec;
+
+    void addCoreVector(CoreVector cv);
+
+    string toString();
+};
 
 #endif //GRAPH_CORE_H

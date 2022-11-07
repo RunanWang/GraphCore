@@ -43,4 +43,37 @@ int CoreVector::get_non_zero_index() const {
     return count;
 }
 
+std::string CoreVector::cvToString() const {
+    std::string s = "[";
+    for (int j = 0; j < length; j++) {
+        if (j != length - 1) {
+            s += std::to_string(vec[j]) + ", ";
+        } else {
+            s += std::to_string(vec[j]);
+        }
+    }
+    s = s + "]";
+    return s;
+}
+
+bool CoreVector::isFather(CoreVector *father) const {
+    int greater = 0;
+    if (this->length != father->length) {
+        return false;
+    }
+    for (int j = 0; j < length; j++) {
+        if (this->vec[j] == father->vec[j]) {
+            continue;
+        } else if (this->vec[j] == (father->vec[j] - 1)) {
+            greater += 1;
+            if (greater > 1) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    return true;
+}
+
 

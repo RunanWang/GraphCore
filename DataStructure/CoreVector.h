@@ -2,6 +2,8 @@
 // Created by 王润安 on 2022/10/31.
 //
 
+#include <string>
+
 #ifndef GRAPH_COREVECTOR_H
 #define GRAPH_COREVECTOR_H
 
@@ -20,13 +22,17 @@ public:
     CoreVector build_ancestor_vector(int index) const;
 
     int get_non_zero_index() const;
+
+    std::string cvToString() const;
+
+    bool isFather(CoreVector *father) const;
 };
 
 struct CVCompartor {
     bool operator()(const CoreVector lhs, const CoreVector rhs) const {
         if (lhs.length < rhs.length) {
             return true;
-        } else if (lhs.length < rhs.length) {
+        } else if (lhs.length > rhs.length) {
             return false;
         }
         for (int j = 0; j < lhs.length; j++) {

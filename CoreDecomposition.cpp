@@ -669,6 +669,7 @@ void bfsMLGCoreDecomposition(MultiLayerGraph mlg) {
     std::cout << "Computed core number: " << numberOfComputedCores << endl;
     std::cout << "Core number: " << coreSet.getSize() << endl;
     coreSet.printCore();
+    coreSet.printCoreNum(nodeNum);
 }
 
 void dfsMLGCoreDecomposition(MultiLayerGraph mlg) {
