@@ -948,3 +948,19 @@ int *peelingCoreDecomposition(Graph g, bool printResult) {
     return coreNumList;
 }
 
+void eachLayerCoreDecomposition(MultiLayerGraph mlg) {
+    int **layerNodeMaxCoreNum = new int *[mlg.getLayerNum()];
+
+    for (int tempLayer = 0; tempLayer < mlg.getLayerNum(); tempLayer++) {
+        auto g = mlg.getGraphList()[tempLayer];
+        layerNodeMaxCoreNum[tempLayer] = peelingCoreDecomposition(g, false);
+    }
+
+    for (int tempNode = 0; tempNode < mlg.getNodeNum(); tempNode++) {
+        auto *tempCV = new CoreVector(mlg.getLayerNum());
+        for (int tempLayer = 0; tempLayer < mlg.getLayerNum(); tempLayer++) {
+            tempCV->vec[tempLayer] = layerNodeMaxCoreNum[tempLayer][tempNode];
+        }
+        cout << tempNode << " " << tempCV->cvToString() << endl;
+    }
+}

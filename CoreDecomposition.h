@@ -18,4 +18,6 @@ void hybridMLGCoreDecomposition(MultiLayerGraph mlg);
 
 int *peelingCoreDecomposition(Graph g, bool printResult);
 
+void eachLayerCoreDecomposition(MultiLayerGraph mlg);
+
 #endif //GRAPH_COREDECOMPOSITION_H
