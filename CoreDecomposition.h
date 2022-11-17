@@ -20,4 +20,8 @@ int *peelingCoreDecomposition(Graph g, bool printResult);
 
 void eachLayerCoreDecomposition(MultiLayerGraph mlg);
 
+int *vertexCentricCoreDecomposition(Graph g, bool printResult);
+
+int *naiveVertexCentricCoreDecomposition(Graph g, bool printResult);
+
 #endif //GRAPH_COREDECOMPOSITION_H
