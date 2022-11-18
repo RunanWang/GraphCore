@@ -949,6 +949,47 @@ int *peelingCoreDecomposition(Graph g, bool printResult) {
     return coreNumList;
 }
 
+int *naivePeelingCoreDecomposition(Graph g, bool printResult) {
+    int nodeNum = g.getNodeNum();
+    int maxDegree = g.getMaxDeg();
+    auto degreeList = g.getNodeDegreeList();
+    int *coreNumList = new int[nodeNum];
+
+    map<int, vector<int>> coreNumToNodeBucket;
+
+    for (int tempDegree = 0; tempDegree < maxDegree; tempDegree++) {
+        coreNumToNodeBucket[tempDegree] = vector<int>{};
+    }
+
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        coreNumToNodeBucket[degreeList[tempNode]].push_back(tempNode);
+    }
+
+    for (int tempDegree = 0; tempDegree <= maxDegree; tempDegree++) {
+        while (!coreNumToNodeBucket[tempDegree].empty()) {
+            auto tempNode = coreNumToNodeBucket[tempDegree].front();
+            coreNumToNodeBucket[tempDegree].erase(coreNumToNodeBucket[tempDegree].begin());
+            coreNumList[tempNode] = tempDegree;
+            for (auto neighborVertex: g.getNeighbor(tempNode)) {
+                int tempVDegree = degreeList[neighborVertex];
+                if (tempVDegree > tempDegree) {
+                    coreNumToNodeBucket[tempVDegree].erase(
+                            std::find(coreNumToNodeBucket[tempVDegree].begin(), coreNumToNodeBucket[tempVDegree].end(),
+                                      neighborVertex));
+                    coreNumToNodeBucket[tempVDegree - 1].push_back(neighborVertex);
+                    degreeList[neighborVertex]--;
+                }
+            }
+        }
+    }
+
+    if (printResult) {
+        cout << "Core Number as Follow: " << endl;
+        printList(coreNumList, nodeNum);
+    }
+    return coreNumList;
+}
+
 int *naiveVertexCentricCoreDecomposition(Graph g, bool printResult) {
     int nodeNum = g.getNodeNum();
     int maxDegree = g.getMaxDeg();
@@ -1026,11 +1067,10 @@ int *naiveVertexCentricCoreDecomposition(Graph g, bool printResult) {
         }
 
         // barrier阶段，更换active-list，并检查结束条件
+        active = false;
         for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
-            if (newActiveList[tempNode]) {
-                break;
-            }
-            active = false;
+            activeList[tempNode] = newActiveList[tempNode];
+            active = active or newActiveList[tempNode];
         }
         if (active) {
             activeList = newActiveList;
@@ -1061,7 +1101,7 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
     // Init
     for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
         nodeToCoreInfoMat[tempNode] = new int[maxDegree];
-        for (int j = 0; j < maxDegree; j++) {
+        for (int j = 0; j <= maxDegree; j++) {
             nodeToCoreInfoMat[tempNode][j] = 0;
         }
         activeList[tempNode] = true;
@@ -1090,14 +1130,13 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
                 int oldCoreness = coreNumList[tempNode];
                 int nowCoreness = coreNumList[tempNode];
                 int support = 0;
-                for (int j = maxDegree; j >= 0; j--) {
+                // check now
+                for (int j = nowCoreness; j <= maxDegree; j++) {
                     support += nodeToCoreInfoMat[tempNode][j];
-                    if (support >= nowCoreness) {
-                        break;
-                    }
-                    if (nowCoreness == j) {
-                        nowCoreness--;
-                    }
+                }
+                while (support < nowCoreness) {
+                    nowCoreness--;
+                    support += nodeToCoreInfoMat[tempNode][nowCoreness];
                 }
 
                 // 如果发生了变化，需要向邻居节点发送变化，并激活邻居节点
@@ -1105,8 +1144,8 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
                     coreNumList[tempNode] = nowCoreness;
                     auto tempNodeNeighbors = g.getNeighbor(tempNode);
                     for (auto neighborV: tempNodeNeighbors) {
-                        nodeToCoreInfoMat[neighborV][oldCoreness] --;
-                        nodeToCoreInfoMat[neighborV][nowCoreness] ++;
+                        nodeToCoreInfoMat[neighborV][oldCoreness]--;
+                        nodeToCoreInfoMat[neighborV][nowCoreness]++;
                         tempActiveList[neighborV] = true;
                     }
                 }
@@ -1114,14 +1153,10 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
         }
 
         // barrier阶段，更换active-list，并检查结束条件
-        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
-            if (tempActiveList[tempNode]) {
-                break;
-            }
-            active = false;
-        }
+        active = false;
         for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
             activeList[tempNode] = tempActiveList[tempNode];
+            active = active or tempActiveList[tempNode];
         }
         cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
         BSPNum++;
@@ -1133,7 +1168,6 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
     }
     return coreNumList;
 }
-
 
 void eachLayerCoreDecomposition(MultiLayerGraph mlg) {
     int **layerNodeMaxCoreNum = new int *[mlg.getLayerNum()];
