@@ -1091,7 +1091,8 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
     int nodeNum = g.getNodeNum();
     int maxDegree = g.getMaxDeg();
 
-    int *coreNumList = g.getNodeDegreeList();           // 最终的结果，即每个点对应点core-num
+    int *tempCoreNumList = g.getNodeDegreeList();           // 最终的结果，即每个点对应点core-num
+    int *coreNumList = new int[nodeNum];
     bool *activeList = new bool[nodeNum];               // 被激活的点
     bool *tempActiveList = new bool[nodeNum];
 
@@ -1103,6 +1104,7 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
     // Init
     timer.startTimer();
     for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        coreNumList[tempNode] = tempCoreNumList[tempNode];
         nodeToCoreInfoMat[tempNode] = new int[maxDegree];
         for (int j = 0; j <= maxDegree; j++) {
             nodeToCoreInfoMat[tempNode][j] = 0;
@@ -1163,9 +1165,7 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
             activeList[tempNode] = tempActiveList[tempNode];
             active = active or tempActiveList[tempNode];
         }
-        if (printResult) {
-            cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
-        }
+        cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
         BSPNum++;
     }
     timer.endTimer();
@@ -1181,7 +1181,8 @@ int *optVertexCentricCoreDecomposition(Graph g, bool printResult) {
     int nodeNum = g.getNodeNum();
     int maxDegree = g.getMaxDeg();
 
-    int *coreNumList = g.getNodeDegreeList();           // 最终的结果，即每个点对应点core-num
+    int *tempCoreNumList = g.getNodeDegreeList();           // 最终的结果，即每个点对应点core-num
+    int *coreNumList = new int[nodeNum];
     bool *activeList = new bool[nodeNum];               // 被激活的点
     bool *tempActiveList = new bool[nodeNum];
 
@@ -1193,6 +1194,7 @@ int *optVertexCentricCoreDecomposition(Graph g, bool printResult) {
     // Init
     timer.startTimer();
     for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        coreNumList[tempNode] = tempCoreNumList[tempNode];
         int length = coreNumList[tempNode];
         nodeToCoreInfoMat[tempNode] = new int[length + 1];
         for (int j = 0; j <= length; j++) {
@@ -1250,15 +1252,18 @@ int *optVertexCentricCoreDecomposition(Graph g, bool printResult) {
                 }
             }
         }
+//        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+//            int oldCoreness = coreNumList[tempNode];
+//            if (nodeToCoreInfoMat[tempNode][oldCoreness] < oldCoreness)
+//                tempActiveList[tempNode] = true;
+//        }
         // barrier阶段，更换active-list，并检查结束条件
         active = false;
         for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
             activeList[tempNode] = tempActiveList[tempNode];
             active = active or tempActiveList[tempNode];
         }
-        if (printResult) {
-            cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
-        }
+        cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
         BSPNum++;
     }
     timer.endTimer();
@@ -1269,7 +1274,7 @@ int *optVertexCentricCoreDecomposition(Graph g, bool printResult) {
     }
     delete[]activeList;
     delete[]tempActiveList;
-    for (int tempNode = 0; tempNode < nodeNum; tempNode++){
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
         delete[] nodeToCoreInfoMat[tempNode];
     }
     delete[] nodeToCoreInfoMat;

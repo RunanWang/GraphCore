@@ -45,14 +45,6 @@ int main(int argc, char *argv[]) {
 //    }
     if (true) {
         // Load GraphCore
-        Graph g3{};
-        g3.loadGraphFromSnapFile("../dataset/facebook.txt");
-        calTimer.startTimer();
-        auto c = optVertexCentricCoreDecomposition(g3, false);
-        calTimer.endTimer();
-        std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
-        calTimer.resetTimer();
-
         loadTimer.startTimer();
         Graph g{};
         g.loadGraphFromSnapFile("../dataset/facebook.txt");
@@ -60,25 +52,28 @@ int main(int argc, char *argv[]) {
         std::cout << "Load Time: " << loadTimer.getTimerSecond() << "s." << std::endl;
         g.showGraphProperties();
 
+        std::cout << "\n===Peeling===" << std::endl;
         // Calculate Core on GraphCore
         calTimer.startTimer();
         auto a = peelingCoreDecomposition(g, false);
         calTimer.endTimer();
         std::cout << "Total Cal Time of peeling: " << calTimer.getTimerSecond() << "s." << std::endl;
 
+        std::cout << "\n===Vertex Centric===" << std::endl;
+        calTimer.resetTimer();
+        calTimer.startTimer();
+        auto b = vertexCentricCoreDecomposition(g, false);
+        calTimer.endTimer();
+        std::cout << "Total Cal Time of vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+        checkSimpleGraphCorenessSame(a, b, g.getNodeNum());
 
-
+        std::cout << "\n===Vertex Centric Opt===" << std::endl;
+        calTimer.resetTimer();
+        calTimer.startTimer();
+        auto c = optVertexCentricCoreDecomposition(g, false);
+        calTimer.endTimer();
+        std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
         checkSimpleGraphCorenessSame(a, c, g.getNodeNum());
-
-//        Graph g2{};
-//        g2.loadGraphFromSnapFile("../dataset/facebook.txt");
-//        calTimer.startTimer();
-//        auto b = vertexCentricCoreDecomposition(g2, false);
-//        calTimer.endTimer();
-//        std::cout << "Total Cal Time of vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
-
-
-
     } else {
         std::cout << "GraphCore supported is simple graph (sg) or multi-layer graph (mlg). Re-input it.\n";
     }
