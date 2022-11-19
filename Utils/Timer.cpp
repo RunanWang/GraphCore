@@ -16,3 +16,7 @@ void Timer::endTimer() {
 double Timer::getTimerSecond() {
     return (double) (totalTime) / CLOCKS_PER_SEC;
 }
+
+void Timer::resetTimer() {
+    totalTime = 0;
+}

@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <algorithm>
+#include <omp.h>
 #include "CoreDecomposition.h"
 #include "Utils/Timer.h"
 #include "Utils/out.h"
@@ -1097,8 +1098,10 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
     int **nodeToCoreInfoMat = new int *[nodeNum];
 
     int BSPNum = 0;
+    Timer timer{};
 
     // Init
+    timer.startTimer();
     for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
         nodeToCoreInfoMat[tempNode] = new int[maxDegree];
         for (int j = 0; j <= maxDegree; j++) {
@@ -1112,8 +1115,10 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
             nodeToCoreInfoMat[neighborV][coreNumList[tempNode]] += 1;
         }
     }
-
+    timer.endTimer();
+    cout << "Load Time = " << timer.getTimerSecond() << "s." << endl;
     // 循环直至所有点都不再active
+    timer.startTimer();
     bool active = true;
     while (active) {
         for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
@@ -1158,14 +1163,116 @@ int *vertexCentricCoreDecomposition(Graph g, bool printResult) {
             activeList[tempNode] = tempActiveList[tempNode];
             active = active or tempActiveList[tempNode];
         }
-        cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
+        if (printResult) {
+            cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
+        }
         BSPNum++;
     }
-
+    timer.endTimer();
+    cout << "Cal Time = " << timer.getTimerSecond() << "s." << endl;
     if (printResult) {
         cout << "Vertex Centric Core Number as Follow: " << endl;
         printList(coreNumList, nodeNum);
     }
+    return coreNumList;
+}
+
+int *optVertexCentricCoreDecomposition(Graph g, bool printResult) {
+    int nodeNum = g.getNodeNum();
+    int maxDegree = g.getMaxDeg();
+
+    int *coreNumList = g.getNodeDegreeList();           // 最终的结果，即每个点对应点core-num
+    bool *activeList = new bool[nodeNum];               // 被激活的点
+    bool *tempActiveList = new bool[nodeNum];
+
+    int **nodeToCoreInfoMat = new int *[nodeNum];
+
+    int BSPNum = 0;
+    Timer timer{};
+
+    // Init
+    timer.startTimer();
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        int length = coreNumList[tempNode];
+        nodeToCoreInfoMat[tempNode] = new int[length + 1];
+        for (int j = 0; j <= length; j++) {
+            nodeToCoreInfoMat[tempNode][j] = 0;
+        }
+        activeList[tempNode] = true;
+    }
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        auto tempNodeNeighbors = g.getNeighbor(tempNode);
+        for (auto neighborV: tempNodeNeighbors) {
+            int j = coreNumList[tempNode] > coreNumList[neighborV] ? coreNumList[neighborV] : coreNumList[tempNode];
+            nodeToCoreInfoMat[neighborV][j] += 1;
+        }
+    }
+    timer.endTimer();
+    cout << "Load Time = " << timer.getTimerSecond() << "s." << endl;
+    // 循环直至所有点都不再active
+    timer.startTimer();
+    bool active = true;
+    while (active) {
+        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+            tempActiveList[tempNode] = false;
+        }
+        int activeNum = 0;
+        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+            // 处理每一个被active的点（也就是收到信息的点）
+            if (activeList[tempNode]) {
+                activeNum++;
+
+                // 检查目前邻居的coreness还能不能支持现有的coreness，并计算出新的coreness
+                int oldCoreness = coreNumList[tempNode];
+                int nowCoreness = coreNumList[tempNode];
+                int support = 0;
+                // check now
+                support += nodeToCoreInfoMat[tempNode][nowCoreness];
+                while (support < nowCoreness) {
+                    nowCoreness--;
+                    support += nodeToCoreInfoMat[tempNode][nowCoreness];
+                }
+                nodeToCoreInfoMat[tempNode][nowCoreness] = support;
+
+                // 如果发生了变化，需要向邻居节点发送变化，并激活邻居节点
+                if (oldCoreness != nowCoreness) {
+                    coreNumList[tempNode] = nowCoreness;
+                    auto tempNodeNeighbors = g.getNeighbor(tempNode);
+                    for (auto neighborV: tempNodeNeighbors) {
+                        if (oldCoreness >= coreNumList[neighborV] and
+                            nowCoreness >= coreNumList[neighborV]) { continue; }
+                        int j = oldCoreness > coreNumList[neighborV] ? coreNumList[neighborV] : oldCoreness;
+                        nodeToCoreInfoMat[neighborV][j]--;
+                        j = nowCoreness > coreNumList[neighborV] ? coreNumList[neighborV] : nowCoreness;
+                        nodeToCoreInfoMat[neighborV][j]++;
+                        tempActiveList[neighborV] = true;
+                    }
+                }
+            }
+        }
+        // barrier阶段，更换active-list，并检查结束条件
+        active = false;
+        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+            activeList[tempNode] = tempActiveList[tempNode];
+            active = active or tempActiveList[tempNode];
+        }
+        if (printResult) {
+            cout << "In round-" << BSPNum << ", " << activeNum << " nodes activated." << endl;
+        }
+        BSPNum++;
+    }
+    timer.endTimer();
+    cout << "Cal Time = " << timer.getTimerSecond() << "s." << endl;
+    if (printResult) {
+        cout << "Vertex Centric Core Number as Follow: " << endl;
+        printList(coreNumList, nodeNum);
+    }
+    delete[]activeList;
+    delete[]tempActiveList;
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++){
+        delete[] nodeToCoreInfoMat[tempNode];
+    }
+    delete[] nodeToCoreInfoMat;
     return coreNumList;
 }
 

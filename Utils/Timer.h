@@ -16,6 +16,8 @@ public:
 
     double getTimerSecond();
 
+    void resetTimer();
+
 private:
     clock_t startTime, endTime, totalTime;
 };

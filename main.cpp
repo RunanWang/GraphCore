@@ -2,7 +2,22 @@
 #include "DataStructure/MultiLayerGraph.h"
 #include "Utils/Timer.h"
 #include "CoreDecomposition.h"
-#include <cstring>
+
+void checkSimpleGraphCorenessSame(int *lhs, int *rhs, int nodeNum) {
+    bool isSame = true;
+    for (int j = 0; j < nodeNum; j++) {
+        if (lhs[j] != rhs[j]) {
+            std::cout << "In coreness of " << j << " : method left " << lhs[j] << " vs method right " << rhs[j]
+                      << std::endl;
+            isSame = false;
+        }
+    }
+    if (!isSame) {
+        std::cout << "[Warning] Two core results not same." << std::endl;
+    } else {
+        std::cout << "Result check pass." << std::endl;
+    }
+}
 
 int main(int argc, char *argv[]) {
     if (argc <= 0) {
@@ -12,34 +27,58 @@ int main(int argc, char *argv[]) {
     Timer loadTimer{};
     auto graphType = argv[0];
 //    if (strncmp("mlg", graphType, 3) != 0) {
+//    if (true) {
+//        // Load GraphCore
+//        loadTimer.startTimer();
+//        MultiLayerGraph g{};
+//        g.loadGraphFromFile("../dataset/homo.txt");
+//        loadTimer.endTimer();
+//        std::cout << "Load Time: " << loadTimer.getTimerSecond() << "s." << std::endl;
+//        g.showGraphProperties();
+//
+//        // Calculate Core on MLG
+//        calTimer.startTimer();
+//        eachLayerCoreDecomposition(g);
+//        bfsMLGCoreDecomposition(g);
+//        calTimer.endTimer();
+//        std::cout << "Total Cal Time: " << calTimer.getTimerSecond() << "s." << std::endl;
+//    }
     if (true) {
         // Load GraphCore
-        loadTimer.startTimer();
-        MultiLayerGraph g{};
-        g.loadGraphFromFile("../dataset/homo.txt");
-        loadTimer.endTimer();
-        std::cout << "Load Time: " << loadTimer.getTimerSecond() << "s." << std::endl;
-        g.showGraphProperties();
-
-        // Calculate Core on MLG
+        Graph g3{};
+        g3.loadGraphFromSnapFile("../dataset/facebook.txt");
         calTimer.startTimer();
-        hybridMLGCoreDecomposition(g);
+        auto c = optVertexCentricCoreDecomposition(g3, false);
         calTimer.endTimer();
-        std::cout << "Total Cal Time: " << calTimer.getTimerSecond() << "s." << std::endl;
-    } else if (strncmp("sg", graphType, 2) != 0) {
-        // Load GraphCore
+        std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+        calTimer.resetTimer();
+
         loadTimer.startTimer();
         Graph g{};
-        g.loadGraphFromSnapFile("/Users/ryan/Desktop/workspace/GraphCore/dataset/facebook.txt");
+        g.loadGraphFromSnapFile("../dataset/facebook.txt");
         loadTimer.endTimer();
         std::cout << "Load Time: " << loadTimer.getTimerSecond() << "s." << std::endl;
         g.showGraphProperties();
 
         // Calculate Core on GraphCore
         calTimer.startTimer();
-        peelingCoreDecomposition(g, true);
+        auto a = peelingCoreDecomposition(g, false);
         calTimer.endTimer();
-        std::cout << "Total Cal Time: " << calTimer.getTimerSecond() << "s." << std::endl;
+        std::cout << "Total Cal Time of peeling: " << calTimer.getTimerSecond() << "s." << std::endl;
+
+
+
+        checkSimpleGraphCorenessSame(a, c, g.getNodeNum());
+
+//        Graph g2{};
+//        g2.loadGraphFromSnapFile("../dataset/facebook.txt");
+//        calTimer.startTimer();
+//        auto b = vertexCentricCoreDecomposition(g2, false);
+//        calTimer.endTimer();
+//        std::cout << "Total Cal Time of vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+
+
+
     } else {
         std::cout << "GraphCore supported is simple graph (sg) or multi-layer graph (mlg). Re-input it.\n";
     }

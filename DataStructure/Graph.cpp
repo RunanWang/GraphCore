@@ -49,7 +49,7 @@ void Graph::addEdge(int fromEdge, int toEdge) {
 
 void Graph::setMaxDegree() {
     for (int j = 0; j < nodeNum; j++) {
-        maxDeg = (maxDeg > nodeDegreeList[j] ? maxDeg: nodeDegreeList[j]);
+        maxDeg = (maxDeg > nodeDegreeList[j] ? maxDeg : nodeDegreeList[j]);
     }
 }
 
@@ -69,7 +69,7 @@ int Graph::getMaxDeg() const {
     return maxDeg;
 }
 
-nodeNeighbor Graph::getNeighbor(int vertex){
+nodeNeighbor Graph::getNeighbor(int vertex) {
     auto neighborVec = neighborList[vertex];
     return neighborVec;
 }
