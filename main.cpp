@@ -74,6 +74,14 @@ int main(int argc, char *argv[]) {
         calTimer.endTimer();
         std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
         checkSimpleGraphCorenessSame(a, c, g.getNodeNum());
+
+        std::cout << "\n===Vertex Centric Lazy===" << std::endl;
+        calTimer.resetTimer();
+        calTimer.startTimer();
+        auto d = lazyVertexCentricCoreDecomposition(g, false);
+        calTimer.endTimer();
+        std::cout << "Total Cal Time of lazy vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+        checkSimpleGraphCorenessSame(a, d, g.getNodeNum());
     } else {
         std::cout << "GraphCore supported is simple graph (sg) or multi-layer graph (mlg). Re-input it.\n";
     }
