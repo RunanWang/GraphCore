@@ -17,7 +17,7 @@ class Core {
 public:
     Core(int _layerNum);
 
-    void addCore(CoreVector coreVector, const set<int>& nodesInCore);
+    void addCore(CoreVector coreVector, const set<int> &nodesInCore);
 
     void printCore();
 
@@ -41,6 +41,42 @@ public:
     void addCoreVector(CoreVector cv);
 
     string toString();
+};
+
+struct SimpleCoreMessage {
+    int oldCoreNum;
+    int newCoreNum;
+};
+
+class SimpleCoreInfo {
+public:
+    void freeSCI();
+
+    void initSCI(int maxNeighborNum, int threadNum, int nowCoreness);
+
+    void addMsg(int threadIx, SimpleCoreMessage msg);
+
+    bool updateCoreness();
+
+    void mergeMsgBufferIntoNeighborCoreness();
+
+    void initNeighborCoreness();
+
+    int getNowCoreness() const;
+
+    int getOldCoreness() const;
+
+private:
+    int _threadNum;
+    int _nowCoreness;
+    int _oldCoreness;
+    bool _updateActivate;
+    int *_msgNum;
+    int *NeighborNowCoreness;
+
+    // 以下是一些在线程中会竞争的资源，本数据结构采用的方法是无锁的方法，使用thread—id存储多个数组，在使用时合并。
+    SimpleCoreMessage **MsgBuffer;
+    bool *bufferActivate;
 };
 
 #endif //GRAPH_CORE_H

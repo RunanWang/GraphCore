@@ -28,6 +28,10 @@ int *optVertexCentricCoreDecomposition(Graph g, bool printResult);
 
 int *lazyVertexCentricCoreDecomposition(Graph g, bool printResult);
 
+int *mpVertexCentricCoreDecomposition(Graph g, bool printResult);
+
+int *mpSingleThreadVertexCentricCoreDecomposition(Graph g, bool printResult);
+
 int *naiveVertexCentricCoreDecomposition(Graph g, bool printResult);
 
 #endif //GRAPH_COREDECOMPOSITION_H

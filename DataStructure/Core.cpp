@@ -6,6 +6,8 @@
 #include <iostream>
 #include <fstream>
 
+#define _GLIBCXX_DEBUG
+
 Core::Core(int _layerNum) {
     layerNum = _layerNum;
 }
@@ -79,7 +81,7 @@ void CoreNum::addCoreVector(CoreVector cv) {
     vector<CoreVector>::iterator iter;
     iter = this->coreNumVec.begin();
     while (iter != this->coreNumVec.end()) {
-        if (iter->isFather(&cv)){
+        if (iter->isFather(&cv)) {
             this->coreNumVec.erase(iter);
             iter -= 1;
         }
@@ -87,7 +89,7 @@ void CoreNum::addCoreVector(CoreVector cv) {
     }
     iter = this->coreNumVec.begin();
     while (iter != this->coreNumVec.end()) {
-        if (cv.isFather(iter.base())){
+        if (cv.isFather(iter.base())) {
             return;
         }
         iter += 1;
@@ -97,8 +99,124 @@ void CoreNum::addCoreVector(CoreVector cv) {
 
 string CoreNum::toString() {
     string s;
-    for (auto tempCV: this->coreNumVec){
+    for (auto tempCV: this->coreNumVec) {
         s += tempCV.cvToString() + "\t";
     }
     return s;
 }
+
+void SimpleCoreInfo::initSCI(int maxNeighborNum, int threadNum, int nowCoreness) {
+    // 给所有的数组做初始化
+    _threadNum = threadNum;
+    _nowCoreness = nowCoreness;
+    _updateActivate = false;
+    _msgNum = new int[threadNum];
+    for (int i = 0; i < threadNum; i++) {
+        _msgNum[i] = 0;
+    }
+    MsgBuffer = new SimpleCoreMessage *[threadNum];
+    for (int i = 0; i < threadNum; i++) {
+        MsgBuffer[i] = new SimpleCoreMessage[maxNeighborNum + 1];
+    }
+    NeighborNowCoreness = new int[nowCoreness + 1];
+    for (int i = 0; i < nowCoreness + 1; i++) {
+        NeighborNowCoreness[i] = 0;
+    }
+    bufferActivate = new bool[threadNum];
+}
+
+void SimpleCoreInfo::addMsg(int threadIx, SimpleCoreMessage msg) {
+    // 其他的点发来的目前预估的新的coreness
+    // 将之存入buffer里
+    MsgBuffer[threadIx][_msgNum[threadIx]] = msg;
+    _msgNum[threadIx]++;
+    // 本点需要处理（需要merge一次处理buffer）
+    bufferActivate[threadIx] = true;
+}
+
+void SimpleCoreInfo::initNeighborCoreness() {
+    // 把buffer里的内容合并到NeighborNowCoreness数组里
+    for (int threadIx = 0; threadIx < _threadNum; threadIx++) {
+        for (int i = 0; i < _msgNum[threadIx]; i++) {
+            SimpleCoreMessage msg = MsgBuffer[threadIx][i];
+            if (msg.newCoreNum < _nowCoreness) {
+                NeighborNowCoreness[msg.newCoreNum]++;
+            } else {
+                NeighborNowCoreness[_nowCoreness]++;
+            }
+        }
+    }
+    // buffer清空
+    for (int threadIx = 0; threadIx < _threadNum; threadIx++) {
+        _msgNum[threadIx] = 0;
+        bufferActivate[threadIx] = false;
+    }
+    // 需要一次update
+    _updateActivate = true;
+}
+
+bool SimpleCoreInfo::updateCoreness() {
+    if (!_updateActivate) {
+        return false;
+    }
+    int support = 0;
+    _oldCoreness = _nowCoreness;
+    // check now
+    support += NeighborNowCoreness[_nowCoreness];
+    while (support < _nowCoreness) {
+        _nowCoreness--;
+        support += NeighborNowCoreness[_nowCoreness];
+    }
+    NeighborNowCoreness[_nowCoreness] = support;
+    _updateActivate = false;
+    if (_oldCoreness != _nowCoreness) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void SimpleCoreInfo::mergeMsgBufferIntoNeighborCoreness() {
+    bool corenessChange = false;
+    for (int threadIx = 0; threadIx < _threadNum; threadIx++) {
+        for (int i = 0; i < _msgNum[threadIx]; i++) {
+            SimpleCoreMessage msg = MsgBuffer[threadIx][i];
+            if (msg.newCoreNum >= _nowCoreness and msg.oldCoreNum >= _nowCoreness) {
+                continue;
+            } else if (msg.newCoreNum < _nowCoreness and msg.oldCoreNum >= _nowCoreness) {
+                corenessChange = true;
+                NeighborNowCoreness[_nowCoreness]--;
+                NeighborNowCoreness[msg.newCoreNum]++;
+            } else if (msg.newCoreNum < _nowCoreness and msg.oldCoreNum < _nowCoreness){
+                corenessChange = true;
+                NeighborNowCoreness[msg.oldCoreNum]--;
+                NeighborNowCoreness[msg.newCoreNum]++;
+            }
+        }
+    }
+    for (int threadIx = 0; threadIx < _threadNum; threadIx++) {
+        bufferActivate[threadIx] = false;
+        _msgNum[threadIx] = 0;
+    }
+    _updateActivate = corenessChange;
+}
+
+int SimpleCoreInfo::getNowCoreness() const{
+    return _nowCoreness;
+}
+
+int SimpleCoreInfo::getOldCoreness() const {
+    return _oldCoreness;
+}
+
+void SimpleCoreInfo::freeSCI() {
+    delete[] _msgNum;
+    delete[] bufferActivate;
+    delete[] NeighborNowCoreness;
+    for (int i = 0; i < _threadNum; i++) {
+        delete[] MsgBuffer[i];
+    }
+    delete[] MsgBuffer;
+}
+
+
