@@ -16,7 +16,7 @@ void Graph::loadGraphFromSnapFile(string filename) {
     nodeDegreeList = new int[nodeNum];
     neighborList = new nodeNeighbor[nodeNum];
     maxDeg = 0;
-    for (int j = 0; j < edgeNum; j++) {
+    for (int j = 0; j < nodeNum; j++) {
         nodeDegreeList[j] = 0;
     }
     for (int j = 0; j < edgeNum; j++) {

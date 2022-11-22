@@ -32,6 +32,8 @@ int *mpVertexCentricCoreDecomposition(Graph g, bool printResult);
 
 int *mpSingleThreadVertexCentricCoreDecomposition(Graph g, bool printResult);
 
+int *optMPVertexCentricCoreDecomposition(Graph g, bool printResult);
+
 int *naiveVertexCentricCoreDecomposition(Graph g, bool printResult);
 
 #endif //GRAPH_COREDECOMPOSITION_H
