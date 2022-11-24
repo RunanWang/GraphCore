@@ -1528,7 +1528,6 @@ int *optMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNu
     int *tempCoreNumList = g.getNodeDegreeList();
 
     bool active = true;
-    int BSPNum = 0;
     Timer timer{};
     int *coreNumList = new int[nodeNum];
     bool *activeList = new bool[nodeNum];
@@ -1548,6 +1547,7 @@ int *optMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNu
 
 #pragma omp parallel default(none) shared(nodeNum, coreNumList, g, active, activeList, nodeToCoreInfoMat)
     {
+        int BSPNum = 0;
         int thread_id = omp_get_thread_num();
         int thread_num = omp_get_num_threads();
         int beginNode = thread_id * (nodeNum / thread_num);
@@ -1576,13 +1576,13 @@ int *optMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNu
             }
         }
         while (active) {
-            for (int tempNode = beginNode; tempNode < endNode; tempNode++) {
+            BSPNum += 1;
+            for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
                 nextActiveList[tempNode] = false;
             }
             for (int tempNode = beginNode; tempNode < endNode; tempNode++) {
                 // 处理每一个被active的点（也就是收到信息的点）
                 if (activeList[tempNode]) {
-                    auto tempNodeNeighbors = g.getNeighbor(tempNode);
                     // 检查目前邻居的coreness还能不能支持现有的coreness，并计算出新的coreness
                     int oldCoreness = threadCoreNumList[tempNode];
                     int nowCoreness = threadCoreNumList[tempNode];
@@ -1595,68 +1595,71 @@ int *optMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNu
                     }
                     nodeToCoreInfoMat[thread_id][tempNode][nowCoreness] = support;
 
-                    // 如果发生了变化，需要向邻居节点发送变化，并激活邻居节点
+                    // 如果发生了变化，需要在下一轮中激活邻居节点
                     if (oldCoreness != nowCoreness) {
+                        // 首先本地的coreness发生变化
                         threadCoreNumList[tempNode] = nowCoreness;
+                        // 然后遍历一遍邻居节点
+                        auto tempNodeNeighbors = g.getNeighbor(tempNode);
                         tempNodeNeighbors = g.getNeighbor(tempNode);
                         for (auto neighborV: tempNodeNeighbors) {
+                            int neighborCoreness = 0;
                             if (neighborV >= beginNode and neighborV < endNode) {
                                 // 本地更新
-                                if (oldCoreness >= threadCoreNumList[neighborV] and
-                                    nowCoreness >= threadCoreNumList[neighborV]) { continue; }
-                                int j = oldCoreness > threadCoreNumList[neighborV] ? threadCoreNumList[neighborV]
-                                                                                   : oldCoreness;
-                                nodeToCoreInfoMat[thread_id][neighborV][j]--;
-                                j = nowCoreness > threadCoreNumList[neighborV] ? threadCoreNumList[neighborV]
-                                                                               : nowCoreness;
-                                nodeToCoreInfoMat[thread_id][neighborV][j]++;
-                                nextActiveList[neighborV] = true;
+                                neighborCoreness = threadCoreNumList[neighborV];
                             } else {
                                 // 外地更新，先存本地，再统一sync
-                                if (oldCoreness >= coreNumList[neighborV] and
-                                    nowCoreness >= coreNumList[neighborV]) { continue; }
-                                int j = oldCoreness > coreNumList[neighborV] ? coreNumList[neighborV] : oldCoreness;
-                                nodeToCoreInfoMat[thread_id][neighborV][j]--;
-                                j = nowCoreness > coreNumList[neighborV] ? coreNumList[neighborV] : nowCoreness;
-                                nodeToCoreInfoMat[thread_id][neighborV][j]++;
-                                nextActiveList[neighborV] = true;
+                                neighborCoreness = coreNumList[neighborV];
                             }
+                            if (oldCoreness >= neighborCoreness and nowCoreness >= neighborCoreness) { continue; }
+                            int j = oldCoreness > neighborCoreness ? neighborCoreness : oldCoreness;
+                            nodeToCoreInfoMat[thread_id][neighborV][j]--;
+                            j = nowCoreness > neighborCoreness ? neighborCoreness : nowCoreness;
+                            nodeToCoreInfoMat[thread_id][neighborV][j]++;
+                            nextActiveList[neighborV] = true;
                         }
                     }
                 }
             }
-
 #pragma omp barrier
             // barrier阶段，合并active-list，合并info-mat，合并coreness-list，并检查结束条件
 #pragma omp single
             {
                 active = false;
+                for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+                    activeList[tempNode] = false;
+                }
             }
+#pragma omp barrier
 #pragma omp critical
             {
-                for (int tempNode = beginNode; tempNode < endNode; tempNode++) {
-                    activeList[tempNode] = nextActiveList[tempNode];
+//                cout << "Thread: " << thread_id << " In Round-" << BSPNum << endl;
+                for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+                    activeList[tempNode] = activeList[tempNode] or nextActiveList[tempNode];
                     active = active or nextActiveList[tempNode];
+                }
+                for (int tempNode = beginNode; tempNode < endNode; tempNode++) {
                     for (int tempThread = 0; tempThread < thread_num; tempThread++) {
                         for (int nowCoreness = 0; nowCoreness <= coreNumList[tempNode]; nowCoreness++) {
                             if (tempThread != thread_id) {
                                 int j = nowCoreness > threadCoreNumList[tempNode] ? threadCoreNumList[tempNode]
                                                                                   : nowCoreness;
-                                nodeToCoreInfoMat[thread_id][tempNode][j] += nodeToCoreInfoMat[tempThread][tempNode][j];
+                                nodeToCoreInfoMat[thread_id][tempNode][j] += nodeToCoreInfoMat[tempThread][tempNode][nowCoreness];
+                                nodeToCoreInfoMat[tempThread][tempNode][nowCoreness] = 0;
                             }
                         }
                     }
                     coreNumList[tempNode] = threadCoreNumList[tempNode];
                 }
-
             }
+#pragma omp barrier
         }
         for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
-            delete [] nodeToCoreInfoMat[thread_id][tempNode];
+            delete[] nodeToCoreInfoMat[thread_id][tempNode];
         }
-        delete []nodeToCoreInfoMat[thread_id];
-        delete []nextActiveList;
-        delete []threadCoreNumList;
+        delete[]nodeToCoreInfoMat[thread_id];
+        delete[]nextActiveList;
+        delete[]threadCoreNumList;
     }
     timer.endTimer();
     if (printResult) {

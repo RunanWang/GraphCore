@@ -123,6 +123,14 @@ void testSGmpCD(string &path) {
     calTimer.endTimer();
     std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, e, g.getNodeNum());
+
+    std::cout << "\n===Vertex Centric MP thread=4===" << std::endl;
+    calTimer.resetTimer();
+    calTimer.startTimer();
+    auto f = optMPVertexCentricCoreDecomposition(g, false,4);
+    calTimer.endTimer();
+    std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+    checkSimpleGraphCorenessSame(a, f, g.getNodeNum());
 }
 
 int main(int argc, char *argv[]) {
