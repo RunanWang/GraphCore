@@ -14,12 +14,16 @@ public:
 
     void endTimer();
 
-    double getTimerSecond();
+    double getTimerSecond() const;
+
+    double getCpuTimeSecond() const;
 
     void resetTimer();
 
 private:
-    clock_t startTime, endTime, totalTime;
+    double startTime, endTime, totalTime;
+    clock_t cpuStartTime, cpuEndTime, cpuTotalTime;
+
 };
 
 

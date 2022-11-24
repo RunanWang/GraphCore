@@ -98,39 +98,53 @@ void testSGmpCD(string &path) {
     calTimer.startTimer();
     auto a = peelingCoreDecomposition(g, false);
     calTimer.endTimer();
-    std::cout << "Total Cal Time of peeling: " << calTimer.getTimerSecond() << "s." << std::endl;
+    std::cout << "Total Time of peeling: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
+              << calTimer.getCpuTimeSecond() << "s." << std::endl;
 
     std::cout << "\n===Vertex Centric Opt===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
     auto c = optVertexCentricCoreDecomposition(g, false);
     calTimer.endTimer();
-    std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+    std::cout << "Total Time of opt: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
+              << calTimer.getCpuTimeSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, c, g.getNodeNum());
 
     std::cout << "\n===Vertex Centric MP thread=1===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto d = pullMPVertexCentricCoreDecomposition(g, false,1);
+    auto d = pullMPVertexCentricCoreDecomposition(g, false, 1);
     calTimer.endTimer();
-    std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+    std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
+              << calTimer.getCpuTimeSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, d, g.getNodeNum());
 
     std::cout << "\n===Vertex Centric MP thread=2===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto e = pullMPVertexCentricCoreDecomposition(g, false,2);
+    auto e = pullMPVertexCentricCoreDecomposition(g, false, 2);
     calTimer.endTimer();
-    std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+    std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
+              << calTimer.getCpuTimeSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, e, g.getNodeNum());
 
     std::cout << "\n===Vertex Centric MP thread=4===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto f = pullMPVertexCentricCoreDecomposition(g, false,4);
+    auto f = pullMPVertexCentricCoreDecomposition(g, false, 4);
     calTimer.endTimer();
-    std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
+    std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
+              << calTimer.getCpuTimeSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, f, g.getNodeNum());
+
+    std::cout << "\n===Vertex Centric MP thread=8===" << std::endl;
+    calTimer.resetTimer();
+    calTimer.startTimer();
+    auto h = pullMPVertexCentricCoreDecomposition(g, false, 8);
+    calTimer.endTimer();
+    std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
+              << calTimer.getCpuTimeSecond() << "s." << std::endl;
+    checkSimpleGraphCorenessSame(a, h, g.getNodeNum());
 }
 
 int main(int argc, char *argv[]) {
