@@ -1688,7 +1688,7 @@ int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadN
         activeList[tempNode] = true;
     }
 
-#pragma omp parallel default(none) shared(g, nodeNum, active, activeList, coreNumList)
+#pragma omp parallel default(none) shared(active, activeList, coreNumList) firstprivate(g, nodeNum)
     {
         int BSPNum = 0;
         int thread_id = omp_get_thread_num();
@@ -1700,6 +1700,7 @@ int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadN
         int **nodeToCoreInfoMat = new int *[nodeNum];
         bool *nextActiveList = new bool[nodeNum];
         int *threadCoreNumList = new int[nodeNum];
+        auto *threadNeighborList = new nodeNeighbor[nodeNum];
         for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
             int nodeDegree = coreNumList[tempNode];
             int *tempCoreInfo = new int[nodeDegree + 1];
@@ -1711,6 +1712,7 @@ int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadN
         for (int tempNode = beginNode; tempNode < endNode; tempNode++) {
             threadCoreNumList[tempNode] = coreNumList[tempNode];
             auto tempNodeNeighbors = g.getNeighbor(tempNode);
+            threadNeighborList[tempNode] = g.getNeighbor(tempNode);
             int nodeDegree = coreNumList[tempNode];
             for (auto neighborV: tempNodeNeighbors) {
                 int neighborDegree = coreNumList[neighborV];
@@ -1722,17 +1724,18 @@ int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadN
             BSPNum += 1;
             for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
                 nextActiveList[tempNode] = false;
+                threadCoreNumList[tempNode] = coreNumList[tempNode];
             }
             for (int tempNode = beginNode; tempNode < endNode; tempNode++) {
                 // 处理每一个被active的点（也就是收到信息的点）
                 if (activeList[tempNode]) {
-                    int nodeDegree = coreNumList[tempNode];
+                    int nodeDegree = threadCoreNumList[tempNode];
                     for (int j = 0; j <= nodeDegree; j++) {
                         nodeToCoreInfoMat[tempNode][j] = 0;
                     }
-                    auto tempNodeNeighbors = g.getNeighbor(tempNode);
+                    auto tempNodeNeighbors = threadNeighborList[tempNode];
                     for (auto neighborV: tempNodeNeighbors) {
-                        int neighborDegree = coreNumList[neighborV];
+                        int neighborDegree = threadCoreNumList[neighborV];
                         int j = nodeDegree > neighborDegree ? neighborDegree : nodeDegree;
                         nodeToCoreInfoMat[tempNode][j] += 1;
                     }
@@ -1790,6 +1793,7 @@ int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadN
         delete[]nodeToCoreInfoMat;
         delete[]nextActiveList;
         delete[]threadCoreNumList;
+        delete[]threadNeighborList;
     }
     if (printResult) {
         cout << "Vertex Centric Core Number as Follow: " << endl;
