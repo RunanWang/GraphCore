@@ -111,7 +111,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=1===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto d = optMPVertexCentricCoreDecomposition(g, false,1);
+    auto d = pullMPVertexCentricCoreDecomposition(g, false,1);
     calTimer.endTimer();
     std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, d, g.getNodeNum());
@@ -119,7 +119,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=2===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto e = optMPVertexCentricCoreDecomposition(g, false,2);
+    auto e = pullMPVertexCentricCoreDecomposition(g, false,2);
     calTimer.endTimer();
     std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, e, g.getNodeNum());
@@ -127,7 +127,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=4===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto f = optMPVertexCentricCoreDecomposition(g, false,4);
+    auto f = pullMPVertexCentricCoreDecomposition(g, false,4);
     calTimer.endTimer();
     std::cout << "Total Cal Time of opt vertex centric: " << calTimer.getTimerSecond() << "s." << std::endl;
     checkSimpleGraphCorenessSame(a, f, g.getNodeNum());
