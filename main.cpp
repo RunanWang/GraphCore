@@ -113,7 +113,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=1===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto d = pullMPVertexCentricCoreDecomposition(g, false, 1);
+    auto d = optMultiVertexCentricCoreDecomposition(g, false, 1);
     calTimer.endTimer();
     std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
               << calTimer.getCpuTimeSecond() << "s." << std::endl;
@@ -122,7 +122,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=2===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto e = pullMPVertexCentricCoreDecomposition(g, false, 2);
+    auto e = optMultiVertexCentricCoreDecomposition(g, false, 2);
     calTimer.endTimer();
     std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
               << calTimer.getCpuTimeSecond() << "s." << std::endl;
@@ -131,7 +131,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=4===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto f = pullMPVertexCentricCoreDecomposition(g, false, 4);
+    auto f = optMultiVertexCentricCoreDecomposition(g, false, 4);
     calTimer.endTimer();
     std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
               << calTimer.getCpuTimeSecond() << "s." << std::endl;
@@ -140,7 +140,7 @@ void testSGmpCD(string &path) {
     std::cout << "\n===Vertex Centric MP thread=8===" << std::endl;
     calTimer.resetTimer();
     calTimer.startTimer();
-    auto h = pullMPVertexCentricCoreDecomposition(g, false, 8);
+    auto h = optMultiVertexCentricCoreDecomposition(g, false, 8);
     calTimer.endTimer();
     std::cout << "Total Time of mp: elapsed=" << calTimer.getTimerSecond() << "s, cpu="
               << calTimer.getCpuTimeSecond() << "s." << std::endl;

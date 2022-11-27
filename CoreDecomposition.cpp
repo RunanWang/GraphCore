@@ -1802,6 +1802,92 @@ int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadN
     return coreNumList;
 }
 
+int *optMultiVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNum) {
+    int nodeNum = g.getNodeNum();
+    int maxDegree = g.getMaxDeg();
+
+    int *tempCoreNumList = g.getNodeDegreeList();           // 最终的结果，即每个点对应点core-num
+    int *coreNumList = new int[nodeNum];
+    bool *activeList = new bool[nodeNum];               // 被激活的点
+    bool **tempActiveList = new bool *[threadNum];
+
+    omp_set_num_threads(threadNum);
+    int BSPNum = 0;
+
+    // Init
+    omp_set_num_threads(threadNum);
+    for (int j = 0; j < threadNum; j++) {
+        tempActiveList[j] = new bool[nodeNum];
+    }
+#pragma omp parallel for default(none) shared(nodeNum, coreNumList, tempCoreNumList, activeList, maxDegree) schedule(dynamic, 256)
+    for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+        coreNumList[tempNode] = tempCoreNumList[tempNode];
+        activeList[tempNode] = true;
+    }
+    bool active = true;
+    while (active) {
+#pragma omp parallel for default(none) shared(tempActiveList, nodeNum, threadNum) schedule(static)
+        for (int j = 0; j < threadNum; j++) {
+            for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+                tempActiveList[omp_get_thread_num()][tempNode] = false;
+            }
+        }
+#pragma omp parallel for default(none) shared(activeList, coreNumList, nodeNum, g, tempActiveList, maxDegree) schedule(dynamic, 256)
+        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+            // 处理每一个被active的点（也就是收到信息的点）
+            if (activeList[tempNode]) {
+                // 检查目前邻居的coreness还能不能支持现有的coreness，并计算出新的coreness
+                int oldCoreness, nowCoreness;
+                oldCoreness = coreNumList[tempNode];
+                nowCoreness = coreNumList[tempNode];
+                int support = 0;
+                int *smallerDegreeCount = new int[nowCoreness];
+                auto tempNodeNeighbors = g.getNeighbor(tempNode);
+                for (int j = 0; j < nowCoreness; j++) {
+                    smallerDegreeCount[j] = 0;
+                }
+                for (auto neighborV: tempNodeNeighbors) {
+                    if (coreNumList[neighborV] >= nowCoreness) {
+                        support++;
+                    } else {
+                        smallerDegreeCount[coreNumList[neighborV]]++;
+                    }
+                }
+                while (support < nowCoreness) {
+                    nowCoreness--;
+                    support += smallerDegreeCount[nowCoreness];
+                }
+                delete[] smallerDegreeCount;
+                // 如果发生了变化，需要向邻居节点发送变化，并激活邻居节点
+                if (oldCoreness != nowCoreness) {
+                    coreNumList[tempNode] = nowCoreness;
+                    tempNodeNeighbors = g.getNeighbor(tempNode);
+                    for (auto neighborV: tempNodeNeighbors) {
+                        int neighborDegree;
+                        tempActiveList[omp_get_thread_num()][neighborV] = true;
+                    }
+                }
+            }
+        }
+        // barrier阶段，更换active-list，并检查结束条件
+#pragma omp barrier
+        active = false;
+        for (int tempNode = 0; tempNode < nodeNum; tempNode++) {
+            activeList[tempNode] = false;
+            for (int j = 0; j < threadNum; j++) {
+                activeList[tempNode] = tempActiveList[j][tempNode] or activeList[tempNode];
+            }
+            active = active or activeList[tempNode];
+        }
+    }
+    if (printResult) {
+        cout << "Vertex Centric Core Number as Follow: " << endl;
+        printList(coreNumList, nodeNum);
+    }
+    delete[]activeList;
+    delete[]tempActiveList;
+    return coreNumList;
+}
 
 void eachLayerCoreDecomposition(MultiLayerGraph mlg) {
     int **layerNodeMaxCoreNum = new int *[mlg.getLayerNum()];

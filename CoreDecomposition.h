@@ -36,6 +36,8 @@ int *optMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNu
 
 int *pullMPVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNum);
 
+int *optMultiVertexCentricCoreDecomposition(Graph g, bool printResult, int threadNum);
+
 int *naiveVertexCentricCoreDecomposition(Graph g, bool printResult);
 
 #endif //GRAPH_COREDECOMPOSITION_H
